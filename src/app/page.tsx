@@ -210,6 +210,7 @@ export default function Home() {
     return (
       <>
         <Studio
+          key={activeId}
           art={view === "studio" ? art : null}
           traceGlyph={view === "draw" ? traceGlyph : undefined}
           drawMode={drawMode}
@@ -225,51 +226,51 @@ export default function Home() {
         {buddyEl}
       </>
     );
-  if (view === "balloon") return <BalloonPop onExit={() => setView("home")} progress={progress} update={update} />;
+  if (view === "balloon") return <BalloonPop key={activeId} onExit={() => setView("home")} progress={progress} update={update} />;
   if (view === "dots")
     return (
       <>
-        <DotsGame onExit={() => setView("home")} progress={progress} update={update} />
+        <DotsGame key={activeId} onExit={() => setView("home")} progress={progress} update={update} />
         {buddyEl}
       </>
     );
   if (view === "learn")
     return (
       <>
-        <LearnMode onExit={() => setView("home")} lang={progress.lang} />
+        <LearnMode key={activeId} onExit={() => setView("home")} lang={progress.lang} />
         {buddyEl}
       </>
     );
   if (view === "gallery")
     return (
       <>
-        <Gallery onExit={() => setView("home")} progress={progress} />
+        <Gallery key={activeId} onExit={() => setView("home")} progress={progress} />
         {buddyEl}
       </>
     );
   if (view === "shadow")
     return (
       <>
-        <ShadowGame onExit={() => setView("home")} progress={progress} update={update} />
+        <ShadowGame key={activeId} onExit={() => setView("home")} progress={progress} update={update} />
         {buddyEl}
       </>
     );
   if (view === "trophies")
     return (
       <>
-        <Achievements onExit={() => setView("home")} progress={progress} />
+        <Achievements key={activeId} onExit={() => setView("home")} progress={progress} />
         {buddyEl}
       </>
     );
   if (view === "buddy")
     return (
       <>
-        <AvatarDesigner onExit={() => setView("home")} progress={progress} update={update} />
+        <AvatarDesigner key={activeId} onExit={() => setView("home")} progress={progress} update={update} />
         {buddyEl}
       </>
     );
   if (view === "store")
-    return <Store onExit={() => setView("home")} progress={progress} update={update} />;
+    return <Store key={activeId} onExit={() => setView("home")} progress={progress} update={update} />;
   if (view === "parent")
     return (
       <ParentArea
@@ -285,7 +286,7 @@ export default function Home() {
     );
 
   return (
-    <main className="relative min-h-[100dvh] overflow-x-hidden bg-[linear-gradient(160deg,#FFF0F8,#EAF5FF_50%,#FFF8E6)] pb-8">
+    <main key={activeId} className="relative min-h-[100dvh] overflow-x-hidden bg-[linear-gradient(160deg,#FFF0F8,#EAF5FF_50%,#FFF8E6)] pb-8">
       <Bubbles />
       {gift && <DailyReward progress={progress} update={update} onClose={() => setGift(false)} />}
 
@@ -533,7 +534,10 @@ export default function Home() {
         <ProfilePicker
           profiles={profiles}
           activeId={activeId}
-          onSwitch={switchProfile}
+          onSwitch={(id) => {
+            switchProfile(id);
+            setShowProfiles(false);
+          }}
           onAdd={addProfile}
           onDelete={deleteProfile}
           onRestore={importProfile}
