@@ -217,6 +217,8 @@ export function ParentArea({
   const [answer, setAnswer] = useState("");
   const [open, setOpen] = useState(false);
   const [doc, setDoc] = useState<"privacy" | "terms" | null>(null);
+  const [famCode, setFamCode] = useState("");
+  const [famMsg, setFamMsg] = useState<string | null>(null);
 
   const toggle = (key: keyof Progress, value: boolean) => {
     update({ [key]: value } as Partial<Progress>);
@@ -433,20 +435,41 @@ export function ParentArea({
         <Card title="💳 Purchases & Ads">
           <Row label="Ads (kid-safe, non-personalised)"><span className="text-xs font-black text-[#7A6C99]">Disabled in this build</span></Row>
           <Row label="Remove ads / Premium packs"><button className="rounded-xl bg-[#F3EFFF] px-3 py-2 text-xs font-black text-[#5B4B7A]">Restore purchase</button></Row>
-          <Row label="🔓 Family unlock (free for your kids)">
-            <button
-              onClick={() => {
-                update({ premiumUnlocked: true });
-                sfx.reward();
-                fx.confetti(140);
-                fx.shake(10);
-                say("Premium unlocked for the whole family!", progress.lang);
-              }}
-              className={`rounded-xl px-3 py-2 text-xs font-black text-white ${progress.premiumUnlocked ? "bg-[#7ED087]" : "bg-gradient-to-r from-[#FFB03A] to-[#FF7FB6]"}`}
-            >
-              {progress.premiumUnlocked ? "✅ Unlocked" : "Unlock for my family"}
-            </button>
+          <Row label={progress.premiumUnlocked ? "🔓 Family premium" : "🔐 Family unlock code"}>
+            {progress.premiumUnlocked ? (
+              <span className="rounded-xl bg-[#7ED087] px-3 py-2 text-xs font-black text-white">✅ Active</span>
+            ) : (
+              <div className="flex items-center gap-1">
+                <input
+                  value={famCode}
+                  onChange={(e) => setFamCode(e.target.value.toUpperCase())}
+                  placeholder="Code"
+                  className="w-28 rounded-lg border-2 border-[#EDE6FF] px-2 py-1.5 text-center text-xs font-black tracking-widest text-[#2E2545] outline-none"
+                />
+                <button
+                  onClick={() => {
+                    if (famCode.trim() === FAMILY_UNLOCK_CODE) {
+                      update({ premiumUnlocked: true });
+                      sfx.reward();
+                      fx.confetti(140);
+                      fx.shake(10);
+                      say("Premium unlocked for the whole family!", progress.lang);
+                      setFamMsg(null);
+                    } else {
+                      sfx.wrong();
+                      fx.shake(10);
+                      setFamMsg("Wrong code");
+                      setFamCode("");
+                    }
+                  }}
+                  className="rounded-lg bg-gradient-to-r from-[#FFB03A] to-[#FF7FB6] px-3 py-1.5 text-xs font-black text-white active:scale-95"
+                >
+                  Activate
+                </button>
+              </div>
+            )}
           </Row>
+          {famMsg && <p className="text-right text-[11px] font-black text-[#C23B5E]">{famMsg}</p>}
           <Row label="Backup progress">
             <button
               onClick={() => {
@@ -597,7 +620,7 @@ export function DailyReward({
 
 /* ============================== STORE ================================== */
 
-import { STORE_ITEMS } from "@/lib/premium";
+import { FAMILY_UNLOCK_CODE, STORE_ITEMS } from "@/lib/premium";
 
 export function Store({
   onExit,

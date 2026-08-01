@@ -134,8 +134,11 @@ function loadStore(): Store {
   const raw = window.localStorage.getItem(ROOT_KEY);
   const parsed = raw && decode(raw);
   if (parsed && parsed.profiles?.length) {
-    // hydrate any missing fields on older profiles
-    parsed.profiles = parsed.profiles.map((p) => ({ ...p, data: { ...DEFAULT_PROGRESS, ...p.data } }));
+    // hydrate any missing fields on older profiles + ensure every child has a cloud code
+    parsed.profiles = parsed.profiles.map((p) => ({
+      ...p,
+      data: { ...DEFAULT_PROGRESS, ...p.data, syncCode: p.data.syncCode || makeSyncCode() },
+    }));
     return parsed;
   }
   // migrate the old single-profile save

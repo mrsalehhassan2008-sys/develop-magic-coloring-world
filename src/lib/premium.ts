@@ -51,6 +51,10 @@ export const STORE_ITEMS: StoreItem[] = [
   },
 ];
 
+/** secret code that unlocks premium for the owner's family only.
+ *  Change it to any code you like before publishing. */
+export const FAMILY_UNLOCK_CODE = "MCW-FAMILY-2026";
+
 export function isBrushPremium(id: string) {
   return PREMIUM_BRUSHES.has(id);
 }
