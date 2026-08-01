@@ -136,6 +136,11 @@ export default function Home() {
 
   useEffect(() => () => stopMusic(), []);
 
+  // never let the profile picker stay open across screens (prevents stuck dim overlay)
+  useEffect(() => {
+    setShowProfiles(false);
+  }, [view]);
+
   const loadCategory = useCallback(
     async (key: string) => {
       setCategory(key);

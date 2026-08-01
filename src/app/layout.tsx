@@ -9,6 +9,7 @@ export const metadata: Metadata = {
     "A premium, ad-free coloring, drawing and learning playground for children 3–8: 110+ original coloring pages, 15 magic brushes, stickers, balloon pop, dot-to-dot and voice learning cards.",
   applicationName: "Magic Coloring World",
   manifest: "/manifest.webmanifest",
+  icons: { icon: "/icon.png", apple: "/icon.png" },
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Magic Coloring World" },
 };
 

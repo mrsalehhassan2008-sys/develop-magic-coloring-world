@@ -975,8 +975,16 @@ export function ProfilePicker({
   const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
 
   return (
-    <div className="fixed inset-0 z-[65] grid place-items-center bg-[#2E2545]/70 p-4">
-      <div className="w-full max-w-md rounded-[32px] bg-white p-5 shadow-2xl">
+    <div
+      className="fixed inset-0 z-[65] overflow-y-auto bg-[#2E2545]/70 p-4"
+      onPointerDown={onClose}
+      onKeyDown={(e) => e.key === "Escape" && onClose()}
+    >
+      <div className="grid min-h-full place-items-center">
+      <div
+        className="w-full max-w-md rounded-[32px] bg-white p-5 shadow-2xl"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <h2 className="text-center text-xl font-black text-[#2E2545]">👶 Who is playing?</h2>
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {profiles.map((p) => (
@@ -1085,6 +1093,7 @@ export function ProfilePicker({
         </div>
 
         <button onClick={onClose} className="mt-3 w-full rounded-2xl bg-[#F3EFFF] py-3 font-black text-[#5B4B7A]">Close</button>
+      </div>
       </div>
     </div>
   );
