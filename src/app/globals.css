@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #2e2545;
+}
+
+html,
+body {
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: "Baloo 2", "Nunito", ui-rounded, "Segoe UI Rounded", system-ui, -apple-system, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  background: #fdf7ff;
+}
+
+button {
+  font-family: inherit;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+input[type="range"] {
+  accent-color: #8e7cff;
+}
+
+#shake-root {
+  will-change: transform;
+  min-height: 100dvh;
+}
+
+@keyframes rise {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.7;
+  }
+  90% {
+    opacity: 0.35;
+  }
+  100% {
+    transform: translateY(-115vh) rotate(220deg);
+    opacity: 0;
+  }
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(3deg);
+  }
+}
+
+@keyframes popIn {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.pop-in {
+  animation: popIn 0.32s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+
+::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d9cff2;
+  border-radius: 99px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

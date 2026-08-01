@@ -1,0 +1,18 @@
+{
+  "name": "Magic Coloring World",
+  "short_name": "Coloring",
+  "description": "Coloring, drawing, stickers and learning games for kids 3-8.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FFE8F4",
+  "theme_color": "#FF7FB6",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
