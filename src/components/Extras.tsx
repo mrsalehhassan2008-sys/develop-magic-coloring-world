@@ -5,7 +5,8 @@ import { fx } from "@/components/FxLayer";
 import { availableVoiceCount, MUSIC_TRACKS, phrase, say, setAudioSetting, setMusicTrack, setVoiceCharacter, sfx, VOICES, type VoiceId } from "@/lib/audio";
 import { BUDDY_FACES, buddyLine } from "@/lib/buddy";
 import { ACHIEVEMENTS } from "@/lib/achievements";
-import { AVATARS, LANGS, type Profile, type Progress } from "@/lib/progress";
+import { jsPDF } from "jspdf";
+import { AVATARS, DEFAULT_PROGRESS, LANGS, type Profile, type Progress } from "@/lib/progress";
 
 /* ============================== LEARN MODE ============================== */
 
@@ -127,11 +128,12 @@ interface Art {
   id: number;
   title: string;
   pageSlug: string;
+  profile?: string;
   thumbnail: string | null;
   createdAt: string;
 }
 
-export function Gallery({ onExit }: { onExit: () => void }) {
+export function Gallery({ onExit, progress }: { onExit: () => void; progress: Progress }) {
   const [items, setItems] = useState<Art[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -151,19 +153,70 @@ export function Gallery({ onExit }: { onExit: () => void }) {
     void load();
   }, [load]);
 
+  const mine = items.filter((a) => !a.profile || a.profile === "kid" || a.profile === progress.name);
+
+  const makePdf = () => {
+    if (!mine.length) return;
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const W = 595;
+    const H = 842;
+    const m = 42;
+    const size = 240;
+    doc.setFontSize(26);
+    doc.setTextColor(46, 37, 69);
+    doc.text(`${progress.name}'s Art Book`, W / 2, 74, { align: "center" });
+    doc.setFontSize(11);
+    doc.setTextColor(122, 108, 153);
+    doc.text(`${mine.length} masterpiece${mine.length > 1 ? "s" : ""} · ${new Date().toLocaleDateString()}`, W / 2, 96, { align: "center" });
+    let x = m;
+    let y = 132;
+    mine.forEach((a) => {
+      if (a.thumbnail) {
+        try {
+          doc.addImage(a.thumbnail, "PNG", x, y, size, size);
+        } catch {
+          /* skip broken image */
+        }
+        doc.setFontSize(9);
+        doc.setTextColor(91, 75, 122);
+        doc.text(a.title.slice(0, 30), x, y + size + 14);
+      }
+      x += size + m;
+      if (x + size > W - m + 20) {
+        x = m;
+        y += size + 46;
+      }
+      if (y + size > H - m) {
+        doc.addPage();
+        y = 60;
+        x = m;
+      }
+    });
+    doc.save(`${progress.name}-art-book.pdf`);
+    sfx.reward();
+    say("Your art book is ready!", progress.lang);
+  };
+
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-[#FFF7FB]">
       <div className="flex items-center gap-2 p-2 sm:p-3">
         <button onClick={onExit} className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-2xl shadow-md active:scale-90" aria-label="Home">🏠</button>
-        <div className="rounded-full bg-white px-4 py-1.5 font-black text-[#5B4B7A] shadow">🖼️ My Gallery</div>
+        <div className="rounded-full bg-white px-4 py-1.5 font-black text-[#5B4B7A] shadow">🖼️ {progress.name}&apos;s Gallery</div>
+        <button
+          onClick={makePdf}
+          disabled={!mine.length}
+          className="ml-auto rounded-full bg-gradient-to-r from-[#FF7FB6] to-[#FFB03A] px-4 py-2 text-sm font-black text-white shadow active:scale-95 disabled:opacity-40"
+        >
+          📖 PDF Book
+        </button>
       </div>
       {loading ? (
         <p className="p-6 text-center font-black text-[#B7A9D4]">Loading…</p>
-      ) : items.length === 0 ? (
+      ) : mine.length === 0 ? (
         <p className="p-6 text-center font-black text-[#B7A9D4]">No artwork yet — colour a page and press 💾</p>
       ) : (
         <div className="grid flex-1 grid-cols-2 content-start gap-3 overflow-y-auto p-3 sm:grid-cols-3 md:grid-cols-5">
-          {items.map((a) => (
+          {mine.map((a) => (
             <div key={a.id} className="overflow-hidden rounded-3xl bg-white shadow-lg">
               {a.thumbnail ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -206,12 +259,18 @@ export function ParentArea({
   update,
   reset,
   onManageProfiles,
+  profiles,
+  onUpdateProfile,
+  onDeleteProfile,
 }: {
   onExit: () => void;
   progress: Progress;
   update: (p: Partial<Progress>) => void;
   reset: () => void;
   onManageProfiles: () => void;
+  profiles: Profile[];
+  onUpdateProfile: (id: string, patch: Partial<Progress>) => void;
+  onDeleteProfile: (id: string) => void;
 }) {
   const [challenge] = useState(() => ({ a: 3 + Math.floor(Math.random() * 7), b: 4 + Math.floor(Math.random() * 8) }));
   const [answer, setAnswer] = useState("");
@@ -219,6 +278,18 @@ export function ParentArea({
   const [doc, setDoc] = useState<"privacy" | "terms" | null>(null);
   const [famCode, setFamCode] = useState("");
   const [famMsg, setFamMsg] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copyCode = (id: string, code: string) => {
+    try {
+      void navigator.clipboard?.writeText(code);
+    } catch {
+      /* ignore */
+    }
+    setCopied(id);
+    sfx.tap();
+    window.setTimeout(() => setCopied(null), 1500);
+  };
 
   const toggle = (key: keyof Progress, value: boolean) => {
     update({ [key]: value } as Partial<Progress>);
@@ -430,6 +501,82 @@ export function ParentArea({
           <Row label="Stars collected"><b className="font-black text-[#FFB03A]">⭐ {progress.stars}</b></Row>
           <Row label="Coins"><b className="font-black text-[#FFB03A]">🪙 {progress.coins}</b></Row>
           <Row label="Pages finished"><b className="font-black text-[#8E7CFF]">{progress.completed.length}</b></Row>
+        </Card>
+
+        <Card title="👶 Kids & cloud codes">
+          <p className="mb-2 text-xs font-bold text-[#7A6C99]">
+            The 🔑 code restores a child (progress + premium) on any device via “Who is playing? → Restore”.
+          </p>
+          <div className="space-y-2">
+            {profiles.map((p) => (
+              <div key={p.id} className="flex items-center justify-between gap-2 rounded-2xl bg-[#FBF7FF] p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-3xl">{p.data.avatar}</span>
+                  <div>
+                    <div className="text-sm font-black text-[#2E2545]">
+                      {p.data.name} {p.data.premiumUnlocked && "👑"} <span className="text-[10px] text-[#FFB03A]">⭐{p.data.stars}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-lg font-black tracking-[0.2em] text-[#8E7CFF]">🔑 {p.data.syncCode}</span>
+                      <button
+                        onClick={() => copyCode(p.id, p.data.syncCode)}
+                        className="grid h-7 w-7 place-items-center rounded-lg bg-white text-sm shadow active:scale-90"
+                        aria-label="Copy code"
+                      >
+                        {copied === p.id ? "✅" : "⧉"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-center">
+                    <Switch
+                      on={p.data.premiumUnlocked}
+                      onChange={(v) => {
+                        onUpdateProfile(p.id, { premiumUnlocked: v });
+                        if (v) {
+                          sfx.reward();
+                          fx.confetti(80);
+                        }
+                      }}
+                    />
+                    <div className="text-[9px] font-black text-[#A99CC4]">👑</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Reset ${p.data.name}'s progress?`)) {
+                        onUpdateProfile(p.id, {
+                          ...DEFAULT_PROGRESS,
+                          name: p.data.name,
+                          avatar: p.data.avatar,
+                          syncCode: p.data.syncCode,
+                          buddyCustom: p.data.buddyCustom,
+                          buddyFace: p.data.buddyFace,
+                          lang: p.data.lang,
+                          premiumUnlocked: p.data.premiumUnlocked,
+                        });
+                        sfx.whoosh();
+                      }
+                    }}
+                    className="grid h-8 w-8 place-items-center rounded-xl bg-[#FFF3CC] text-sm active:scale-90"
+                    aria-label="Reset child"
+                  >
+                    🔄
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (profiles.length > 1 && window.confirm(`Delete ${p.data.name}?`)) onDeleteProfile(p.id);
+                    }}
+                    disabled={profiles.length <= 1}
+                    className="grid h-8 w-8 place-items-center rounded-xl bg-[#FFE9EF] text-sm active:scale-90 disabled:opacity-40"
+                    aria-label="Delete child"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </Card>
 
         <Card title="💳 Purchases & Ads">

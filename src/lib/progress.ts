@@ -237,6 +237,33 @@ export function useProgress() {
     });
   }, []);
 
+  /** update ANY profile by id (used by the parent dashboard) + instant cloud push */
+  const updateProfile = useCallback((id: string, patch: Partial<Progress> | ((p: Progress) => Partial<Progress>)) => {
+    setStore((prev) => {
+      if (!prev) return prev;
+      let changedData: Progress | null = null;
+      const next: Store = {
+        ...prev,
+        profiles: prev.profiles.map((p) => {
+          if (p.id !== id) return p;
+          const delta = typeof patch === "function" ? patch(p.data) : patch;
+          changedData = { ...p.data, ...delta };
+          return { ...p, data: changedData };
+        }),
+      };
+      saveStore(next);
+      const d = changedData as Progress | null;
+      if (d?.syncCode) {
+        const code = d.syncCode;
+        const data = d;
+        window.setTimeout(() => {
+          fetch("/api/progress", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, data }) }).catch(() => undefined);
+        }, 300);
+      }
+      return next;
+    });
+  }, []);
+
   /** import a profile restored from the cloud (by sync code) */
   const importProfile = useCallback((data: Progress) => {
     setStore((prev) => {
@@ -270,6 +297,7 @@ export function useProgress() {
     switchProfile,
     deleteProfile,
     importProfile,
+    updateProfile,
   };
 }
 

@@ -629,6 +629,7 @@ export default function Studio({
       body: JSON.stringify({
         pageSlug: art?.slug ?? "free-draw",
         title: art?.title ?? "Free Drawing",
+        profile: progress.name,
         fills,
         strokes,
         stickers,

@@ -44,7 +44,7 @@ interface PageRow {
 }
 
 export default function Home() {
-  const { progress, update, reset, ready, profiles, activeId, addProfile, switchProfile, deleteProfile, importProfile } = useProgress();
+  const { progress, update, reset, ready, profiles, activeId, addProfile, switchProfile, deleteProfile, importProfile, updateProfile } = useProgress();
   const [view, setView] = useState<View>("home");
   const [started, setStarted] = useState(false);
   const [category, setCategory] = useState<string>("scenes");
@@ -243,7 +243,7 @@ export default function Home() {
   if (view === "gallery")
     return (
       <>
-        <Gallery onExit={() => setView("home")} />
+        <Gallery onExit={() => setView("home")} progress={progress} />
         {buddyEl}
       </>
     );
@@ -278,6 +278,9 @@ export default function Home() {
         update={update}
         reset={reset}
         onManageProfiles={() => setShowProfiles(true)}
+        profiles={profiles}
+        onUpdateProfile={updateProfile}
+        onDeleteProfile={deleteProfile}
       />
     );
 
