@@ -247,7 +247,7 @@ export default function BalloonPop({
         fx.shake(5 + g.combo);
         if (g.combo >= 4 && g.combo % 3 === 1) {
           fx.confetti(40);
-          say(randomPraise(), progress.lang);
+          say(randomPraise(progress.lang), progress.lang);
         }
         if (g.hits % 5 === 0) {
           g.level++;

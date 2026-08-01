@@ -139,7 +139,7 @@ export default function DotsGame({
       sfx.celebrate();
       fx.confetti(140);
       fx.shake(12);
-      say(`${randomPraise()} It is a ${puzzle.name.split(" ")[0]}!`, progress.lang);
+      say(`${randomPraise(progress.lang)}`, progress.lang);
       update({ stars: progress.stars + 2, coins: progress.coins + 5, bestDots: Math.max(progress.bestDots, index + 1) });
     }
   };

@@ -33,6 +33,7 @@ export interface PageArt {
   emoji: string;
   viewBox: string;
   shapes: Shape[];
+  premium?: boolean;
 }
 
 let uid = 0;

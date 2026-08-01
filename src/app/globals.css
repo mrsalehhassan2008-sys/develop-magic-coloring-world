@@ -61,6 +61,28 @@ input[type="range"] {
   }
 }
 
+@keyframes buddyIdle {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-6px) rotate(2deg); }
+}
+@keyframes buddyWave {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-14deg) scale(1.12); }
+  75% { transform: rotate(14deg) scale(1.12); }
+}
+@keyframes buddyTalk {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+@keyframes tapHint {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-14px) scale(0.9); }
+}
+@keyframes hintRing {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
 @keyframes popIn {
   0% {
     transform: scale(0.6);

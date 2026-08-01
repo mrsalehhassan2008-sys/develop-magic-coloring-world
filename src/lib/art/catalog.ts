@@ -1,22 +1,20 @@
-import { bird, car, critter, CritterOpts, dino, DinoOpts, flower, food, makePage, princess, scene, SceneOpts, sea, space } from "./builders";
+import { bird, car, critter, CritterOpts, dino, DinoOpts, flower, food, makePage, princess, sea, space } from "./builders";
 import { PageArt, resetIds } from "./shapes";
+import { buildScenes } from "./scenes";
 
 export const CATEGORIES = [
-  { key: "animals", label: "Animals", emoji: "🐻", color: "#FF9F68", premium: false },
-  { key: "dinosaurs", label: "Dinosaurs", emoji: "🦕", color: "#7ED087", premium: true },
-  { key: "cars", label: "Cars", emoji: "🚗", color: "#5AC8FA", premium: false },
-  { key: "princesses", label: "Princesses", emoji: "👑", color: "#FF7FB6", premium: true },
-  { key: "space", label: "Space", emoji: "🚀", color: "#8E7CFF", premium: true },
-  { key: "sea", label: "Sea Animals", emoji: "🐬", color: "#38C6D9", premium: false },
-  { key: "farm", label: "Farm Animals", emoji: "🐮", color: "#FFC94D", premium: false },
-  { key: "birds", label: "Birds", emoji: "🦜", color: "#FF6B8B", premium: true },
-  { key: "flowers", label: "Flowers", emoji: "🌸", color: "#FF97C9", premium: false },
-  { key: "food", label: "Food", emoji: "🍩", color: "#FFB03A", premium: false },
-  { key: "scenes", label: "Scenes & Places", emoji: "🏡", color: "#7ED087", premium: true },
+  { key: "scenes", label: "Big Pictures", emoji: "🏞️", color: "#7ED087" },
+  { key: "animals", label: "Animals", emoji: "🐻", color: "#FF9F68" },
+  { key: "dinosaurs", label: "Dinosaurs", emoji: "🦕", color: "#7ED087" },
+  { key: "cars", label: "Cars", emoji: "🚗", color: "#5AC8FA" },
+  { key: "princesses", label: "Princesses", emoji: "👑", color: "#FF7FB6" },
+  { key: "space", label: "Space", emoji: "🚀", color: "#8E7CFF" },
+  { key: "sea", label: "Sea Animals", emoji: "🐬", color: "#38C6D9" },
+  { key: "farm", label: "Farm Animals", emoji: "🐮", color: "#FFC94D" },
+  { key: "birds", label: "Birds", emoji: "🦜", color: "#FF6B8B" },
+  { key: "flowers", label: "Flowers", emoji: "🌸", color: "#FF97C9" },
+  { key: "food", label: "Food", emoji: "🍩", color: "#FFB03A" },
 ] as const;
-
-export const FREE_CATEGORIES = CATEGORIES.filter(c => !c.premium);
-export const PREMIUM_CATEGORIES = CATEGORIES.filter(c => c.premium);
 
 type Spec = [string, string, CritterOpts];
 
@@ -160,50 +158,6 @@ const FOODS: [string, string, string, string, string][] = [
   ["candy", "Lolly Candy", "candy", "#FF7FB6", "#5AC8FA"],
 ];
 
-const SCENES: [string, string, SceneOpts, number][] = [
-  // Easy (difficulty 1) - Simple elements, fewer shapes
-  ["garden-sunny", "Sunny Garden", { hasSun: true, hasClouds: true, hasFlowers: true, hasTree: true, hasFence: true }, 1],
-  ["flower-meadow", "Flower Meadow", { hasSun: true, hasClouds: true, hasFlowers: true, hasTree: true }, 1],
-  ["spring-garden", "Spring Garden", { hasSun: true, hasClouds: true, hasFlowers: true, hasTree: true, hasFence: true, groundColor: "#9CE087" }, 1],
-  ["park-day", "Park Day", { hasSun: true, hasClouds: true, hasTree: true, hasFlowers: true, hasFence: true }, 1],
-  ["rainbow-field", "Rainbow Field", { hasSun: true, hasClouds: true, hasFlowers: true, hasTree: true }, 1],
-  ["simple-lake", "Simple Lake", { hasSun: true, hasClouds: true, hasWater: true }, 1],
-  ["basic-farm", "Basic Farm", { hasSun: true, hasClouds: true, hasHouse: true }, 1],
-  ["sunny-hill", "Sunny Hill", { hasSun: true, hasClouds: true, hasTree: true }, 1],
-  ["flower-patch", "Flower Patch", { hasSun: true, hasClouds: false, hasFlowers: true }, 1],
-  ["cloudy-day", "Cloudy Day", { hasSun: false, hasClouds: true, hasTree: true }, 1],
-  // Medium (difficulty 2) - More elements
-  ["seaside-house", "House by the Sea", { hasSun: true, hasClouds: true, hasWater: true, hasHouse: true, hasTree: true }, 2],
-  ["country-home", "Country Home", { hasSun: true, hasClouds: true, hasHouse: true, hasTree: true, hasFlowers: true, hasFence: true }, 2],
-  ["lake-house", "Lake House", { hasSun: true, hasClouds: true, hasWater: true, hasHouse: true, hasTree: true }, 2],
-  ["cozy-cottage", "Cozy Cottage", { hasSun: true, hasClouds: true, hasHouse: true, hasTree: true, hasFlowers: true, hasFence: true }, 2],
-  ["morning-farm", "Morning Farm", { hasSun: true, hasClouds: true, hasHouse: true, hasTree: true, hasFence: true, groundColor: "#B5E088" }, 2],
-  ["ocean-view", "Ocean View", { hasSun: true, hasClouds: true, hasWater: true, hasTree: true }, 2],
-  ["riverside", "Riverside", { hasSun: true, hasClouds: true, hasWater: true, hasTree: true, hasFlowers: true }, 2],
-  ["mountain-home", "Mountain Home", { hasSun: true, hasClouds: true, hasHouse: true, hasTree: true }, 2],
-  ["forest-edge", "Forest Edge", { hasSun: true, hasClouds: true, hasTree: true, hasFlowers: true }, 2],
-  ["village-street", "Village Street", { hasSun: true, hasClouds: true, hasHouse: true, hasFence: true }, 2],
-  ["apple-orchard", "Apple Orchard", { hasSun: true, hasClouds: true, hasTree: true, hasFlowers: true }, 2],
-  ["pond-scene", "Pond Scene", { hasSun: true, hasClouds: true, hasWater: true, hasTree: true }, 2],
-  ["windy-day", "Windy Day", { hasSun: true, hasClouds: true, hasTree: true, hasFlowers: true }, 2],
-  ["berry-bush", "Berry Bush Garden", { hasSun: true, hasClouds: true, hasFlowers: true, hasFence: true }, 2],
-  // Hard (difficulty 3) - Complex scenes with many elements
-  ["sunset-beach", "Sunset Beach", { hasSun: false, hasClouds: true, hasWater: true, time: "sunset" }, 3],
-  ["night-village", "Night Village", { hasSun: false, hasClouds: false, hasHouse: true, hasTree: true, hasFence: true, time: "night" }, 3],
-  ["winter-scene", "Winter Wonderland", { hasSun: false, hasClouds: true, hasHouse: true, hasTree: true, hasFence: true, groundColor: "#E8F4F8" }, 3],
-  ["tropical-beach", "Tropical Beach", { hasSun: true, hasClouds: true, hasWater: true, hasTree: true, groundColor: "#FFE9A8" }, 3],
-  ["city-park", "City Park", { hasSun: true, hasClouds: true, hasTree: true, hasFlowers: true, hasFence: true, hasHouse: true }, 3],
-  ["countryside", "Countryside View", { hasSun: true, hasClouds: true, hasHouse: true, hasTree: true, hasWater: true, hasFence: true }, 3],
-  ["desert-oasis", "Desert Oasis", { hasSun: true, hasClouds: false, hasWater: true, hasTree: true, groundColor: "#F4D9A8" }, 3],
-  ["harvest-farm", "Harvest Farm", { hasSun: true, hasClouds: true, hasHouse: true, hasTree: true, hasFlowers: true, hasFence: true }, 3],
-  ["lighthouse-coast", "Lighthouse Coast", { hasSun: true, hasClouds: true, hasWater: true, hasHouse: true }, 3],
-  ["alpine-village", "Alpine Village", { hasSun: true, hasClouds: true, hasHouse: true, hasTree: true, hasFence: true }, 3],
-  ["jungle-river", "Jungle River", { hasSun: true, hasClouds: true, hasWater: true, hasTree: true }, 3],
-  ["autumn-park", "Autumn Park", { hasSun: true, hasClouds: true, hasTree: true, hasFlowers: true, hasFence: true }, 3],
-  ["cherry-blossom", "Cherry Blossom Garden", { hasSun: true, hasClouds: true, hasTree: true, hasFlowers: true, hasWater: true }, 3],
-  ["medieval-castle", "Medieval Castle", { hasSun: true, hasClouds: true, hasHouse: true, hasTree: true, hasFence: true }, 3],
-];
-
 let cache: PageArt[] | null = null;
 
 /** Deterministic catalogue: swap for a DB query to scale to 5,000+ pages. */
@@ -211,6 +165,7 @@ export function buildCatalog(): PageArt[] {
   if (cache) return cache;
   resetIds();
   const pages: PageArt[] = [];
+  buildScenes().forEach((p) => pages.push(p));
   ANIMALS.forEach(([slug, title, o], i) =>
     pages.push(makePage(`animals-${slug}`, title, "animals", "🐾", 1 + (i % 3), critter(o))),
   );
@@ -241,9 +196,22 @@ export function buildCatalog(): PageArt[] {
   FOODS.forEach(([slug, title, kind, a, b], i) =>
     pages.push(makePage(`food-${slug}`, title, "food", "🍓", 1 + (i % 3), food(kind, a, b))),
   );
-  SCENES.forEach(([slug, title, o, diff], i) =>
-    pages.push(makePage(`scenes-${slug}`, title, "scenes", "🏡", diff, scene(o))),
-  );
+
+  // ---- Freemium: keep a generous free tier, lock the rest as Premium ----
+  // Free = first N of each category (scenes get 2 free, others get 3 free).
+  const seen: Record<string, number> = {};
+  for (const p of pages) {
+    const n = seen[p.category] ?? 0;
+    const freeQuota = p.category === "scenes" ? 2 : 3;
+    p.premium = n >= freeQuota;
+    seen[p.category] = n + 1;
+  }
+
   cache = pages;
   return pages;
+}
+
+/** true if a page requires the Premium unlock */
+export function isPremiumPage(slug: string): boolean {
+  return buildCatalog().find((p) => p.slug === slug)?.premium ?? false;
 }

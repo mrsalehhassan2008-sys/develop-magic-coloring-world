@@ -17,7 +17,7 @@ async function ensureSeed() {
     title: p.title,
     category: p.category,
     difficulty: p.difficulty,
-    premium: false,
+    premium: p.premium ?? false,
     orderIndex: i,
     data: { emoji: p.emoji, viewBox: p.viewBox, shapes: p.shapes },
   }));

@@ -66,6 +66,16 @@ export const highScores = pgTable(
   (t) => [index("high_scores_mode_score_idx").on(t.mode, t.score)],
 );
 
+/** Live co-op coloring rooms (polling-based realtime). */
+export const rooms = pgTable("rooms", {
+  code: text("code").primaryKey(),
+  pageSlug: text("page_slug").notNull(),
+  fills: jsonb("fills").notNull().default({}),
+  stickers: jsonb("stickers").notNull().default([]),
+  names: jsonb("names").notNull().default([]),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 /** Player progress: stars, coins, unlocks, daily rewards. */
 export const progress = pgTable(
   "progress",
@@ -76,28 +86,12 @@ export const progress = pgTable(
     coins: integer("coins").notNull().default(0),
     pagesCompleted: integer("pages_completed").notNull().default(0),
     unlocks: jsonb("unlocks").notNull().default([]),
-    purchases: jsonb("purchases").notNull().default([]), // ['premium-animals', 'all-access']
     lastRewardDay: text("last_reward_day"),
+    /** full serialized child profile for cross-device cloud save */
+    data: jsonb("data"),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("progress_profile_idx").on(t.profile)],
-);
-
-/** In-app purchase products */
-export const products = pgTable(
-  "products",
-  {
-    id: serial("id").primaryKey(),
-    productId: text("product_id").notNull().unique(),
-    title: text("title").notNull(),
-    description: text("description").notNull(),
-    price: integer("price").notNull(), // in cents
-    currency: text("currency").notNull().default("USD"),
-    type: text("type").notNull(), // 'unlock_category' | 'unlock_all' | 'remove_ads'
-    content: jsonb("content").notNull(), // { categories: ['dinosaurs', 'princesses'] }
-    active: boolean("active").notNull().default(true),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-  },
 );
 
 export type ColoringPageRow = typeof coloringPages.$inferSelect;

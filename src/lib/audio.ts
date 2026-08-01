@@ -103,11 +103,34 @@ export const sfx = {
 };
 
 /** soft, non repetitive lullaby pad – random walk over a pentatonic scale */
+export const MUSIC_TRACKS = [
+  { key: "lullaby", label: "Lullaby", emoji: "🌙" },
+  { key: "happy", label: "Happy", emoji: "☀️" },
+  { key: "dreamy", label: "Dreamy", emoji: "✨" },
+] as const;
+
+const TRACK_SCALES: Record<string, { scale: number[]; interval: number; type: OscillatorType; vol: number }> = {
+  lullaby: { scale: [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25], interval: 1900, type: "triangle", vol: 0.09 },
+  happy: { scale: [329.63, 392.0, 440.0, 493.88, 587.33, 659.25, 783.99, 880.0], interval: 1300, type: "sine", vol: 0.08 },
+  dreamy: { scale: [220.0, 261.63, 329.63, 349.23, 440.0, 523.25, 587.33, 698.46], interval: 2400, type: "sine", vol: 0.07 },
+};
+
+let currentTrack = "lullaby";
+export function setMusicTrack(key: string) {
+  if (currentTrack === key) return;
+  currentTrack = key;
+  if (musicTimer !== null) {
+    stopMusic();
+    startMusic();
+  }
+}
+
 export function startMusic() {
   if (musicTimer !== null) return;
   const c = ac();
   if (!c || !musicGain) return;
-  const scale = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25];
+  const cfg = TRACK_SCALES[currentTrack] ?? TRACK_SCALES.lullaby;
+  const scale = cfg.scale;
   let idx = 2;
   const step = () => {
     if (!settings.music) return;
@@ -120,10 +143,10 @@ export function startMusic() {
     [f, f * 1.5].forEach((freq, i) => {
       const osc = cc.createOscillator();
       const g = cc.createGain();
-      osc.type = i ? "sine" : "triangle";
+      osc.type = i ? "sine" : cfg.type;
       osc.frequency.value = freq;
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(i ? 0.05 : 0.09, t + 0.5);
+      g.gain.exponentialRampToValueAtTime(i ? cfg.vol * 0.55 : cfg.vol, t + 0.5);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
       osc.connect(g);
       g.connect(out);
@@ -132,7 +155,7 @@ export function startMusic() {
     });
   };
   step();
-  musicTimer = window.setInterval(step, 1900);
+  musicTimer = window.setInterval(step, cfg.interval);
 }
 
 export function stopMusic() {
@@ -142,168 +165,176 @@ export function stopMusic() {
   }
 }
 
-export type VoiceType = "teacher-male" | "teacher-female" | "kid-boy" | "kid-girl" | "friendly";
+/* ---------------------- Voice characters ------------------------------- */
 
-let selectedVoiceType: VoiceType = "friendly";
-let selectedVoice: SpeechSynthesisVoice | null = null;
+export type VoiceId = "teacher_m" | "teacher_f" | "boy" | "girl";
 
-export function setVoiceType(type: VoiceType) {
-  selectedVoiceType = type;
-  // Try to find a matching voice
-  if (typeof window !== "undefined" && window.speechSynthesis) {
-    const voices = window.speechSynthesis.getVoices();
-    // Try to match by name/type
-    if (type === "teacher-female" || type === "kid-girl") {
-      selectedVoice = voices.find((v) => v.name.includes("Female") || v.name.includes("Girl") || v.name.includes("Zira") || v.name.includes("Google")) || null;
-    } else if (type === "teacher-male" || type === "kid-boy") {
-      selectedVoice = voices.find((v) => v.name.includes("Male") || v.name.includes("Boy") || v.name.includes("David") || v.name.includes("Google")) || null;
-    } else {
-      selectedVoice = voices.find((v) => v.name.includes("Friendly") || v.name.includes("Google")) || null;
-    }
+export interface VoiceChar {
+  id: VoiceId;
+  label: string;
+  emoji: string;
+  /** slower for kids so they can follow every word */
+  rate: number;
+  pitch: number;
+  gender: "male" | "female";
+  /** prefer a young sounding voice when available */
+  young: boolean;
+}
+
+export const VOICES: VoiceChar[] = [
+  { id: "teacher_f", label: "Ms. Teacher", emoji: "👩‍🏫", rate: 0.72, pitch: 1.1, gender: "female", young: false },
+  { id: "teacher_m", label: "Mr. Teacher", emoji: "👨‍🏫", rate: 0.68, pitch: 0.8, gender: "male", young: false },
+  { id: "girl", label: "Girl", emoji: "👧", rate: 0.82, pitch: 1.8, gender: "female", young: true },
+  { id: "boy", label: "Boy", emoji: "👦", rate: 0.8, pitch: 1.45, gender: "male", young: true },
+];
+
+export const voicePref = { id: "teacher_f" as VoiceId };
+export function setVoiceCharacter(id: VoiceId) {
+  voicePref.id = id;
+}
+
+let systemVoices: SpeechSynthesisVoice[] = [];
+function loadSystemVoices() {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  systemVoices = window.speechSynthesis.getVoices();
+}
+if (typeof window !== "undefined" && window.speechSynthesis) {
+  loadSystemVoices();
+  window.speechSynthesis.onvoiceschanged = loadSystemVoices;
+}
+
+/** how many distinct system voices are installed – used to warn the parent */
+export function availableVoiceCount(lang?: string) {
+  if (!systemVoices.length) loadSystemVoices();
+  if (!lang) return systemVoices.length;
+  const base = lang.split("-")[0].toLowerCase();
+  return systemVoices.filter((v) => v.lang.toLowerCase().startsWith(base)).length;
+}
+
+const FEMALE_HINTS = ["female", "woman", "girl", "samantha", "victoria", "zira", "hoda", "amelie", "amélie", "anna", "google uk english female", "karen", "tessa", "fiona", "moira", "paulina", "milena", "alice", "ellen", "luciana", "yelda"];
+const MALE_HINTS = ["male", "man", "boy", "daniel", "david", "fred", "alex", "google uk english male", "rishi", "diego", "jorge", "juan", "thomas", "yannick", "maged", "carlos", "luca"];
+
+/** score a voice for a given character so each character gets a DIFFERENT voice */
+function pickSystemVoice(char: VoiceChar, lang: string, avoid?: SpeechSynthesisVoice): SpeechSynthesisVoice | undefined {
+  if (!systemVoices.length) loadSystemVoices();
+  if (!systemVoices.length) return undefined;
+  const base = lang.split("-")[0].toLowerCase();
+  const sameLang = systemVoices.filter((v) => v.lang.toLowerCase().startsWith(base));
+  const pool = sameLang.length ? sameLang : systemVoices;
+  const wanted = char.gender === "female" ? FEMALE_HINTS : MALE_HINTS;
+  const wrong = char.gender === "female" ? MALE_HINTS : FEMALE_HINTS;
+
+  const scored = pool
+    .map((v) => {
+      const name = v.name.toLowerCase();
+      let score = 0;
+      if (wanted.some((h) => name.includes(h))) score += 6;
+      if (wrong.some((h) => name.includes(h))) score -= 5;
+      if (v.lang.toLowerCase() === lang.toLowerCase()) score += 2;
+      if (avoid && v.name === avoid.name) score -= 3; // prefer a distinct voice
+      return { v, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  return scored[0]?.v;
+}
+
+/** distinct voice per character within the currently installed set */
+function voiceForChar(char: VoiceChar, lang: string): SpeechSynthesisVoice | undefined {
+  // give teacher/kid pairs a chance at different physical voices
+  const primary = pickSystemVoice(char, lang);
+  if (char.young && primary) {
+    const alt = pickSystemVoice(char, lang, primary);
+    return alt ?? primary;
   }
+  return primary;
 }
 
-export function getVoiceType(): VoiceType {
-  return selectedVoiceType;
-}
-
-export function say(text: string, lang = "en-US") {
+export function say(text: string, lang = "en-US", voiceId?: VoiceId) {
   if (!settings.voice || typeof window === "undefined" || !window.speechSynthesis) return;
   try {
     window.speechSynthesis.cancel();
+    const char = VOICES.find((v) => v.id === (voiceId ?? voicePref.id)) ?? VOICES[0];
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang;
-    
-    // Set voice if available
-    if (selectedVoice) {
-      u.voice = selectedVoice;
-    }
-    
-    // Slower rate for children to comprehend - vary by language
-    const isArabic = lang.startsWith("ar");
-    const isFrench = lang.startsWith("fr");
-    const isSpanish = lang.startsWith("es");
-    
-    // Base rate - slower for better comprehension
-    u.rate = isArabic ? 0.55 : 0.60;
-    
-    // Adjust pitch and rate based on voice type
-    switch (selectedVoiceType) {
-      case "teacher-male":
-        u.pitch = isArabic ? 0.75 : 0.85;
-        u.rate = isArabic ? 0.60 : 0.70;
-        break;
-      case "teacher-female":
-        u.pitch = isArabic ? 1.05 : 1.15;
-        u.rate = isArabic ? 0.65 : 0.68;
-        break;
-      case "kid-boy":
-        u.pitch = isArabic ? 1.35 : 1.45;
-        u.rate = isArabic ? 0.70 : 0.75;
-        break;
-      case "kid-girl":
-        u.pitch = isArabic ? 1.45 : 1.55;
-        u.rate = isArabic ? 0.70 : 0.75;
-        break;
-      case "friendly":
-      default:
-        u.pitch = isArabic ? 1.15 : 1.25;
-        u.rate = isArabic ? 0.60 : 0.65;
-        break;
-    }
-    
-    // Language-specific adjustments
-    if (isFrench) u.rate *= 0.95;
-    if (isSpanish) u.rate *= 0.95;
-    
+    u.rate = char.rate; // slow & clear for children
+    u.pitch = char.pitch; // distinct pitch per character (works even with 1 system voice)
+    u.volume = 1;
+    const sysVoice = voiceForChar(char, lang);
+    if (sysVoice) u.voice = sysVoice;
     window.speechSynthesis.speak(u);
   } catch {
     /* ignore */
   }
 }
 
-// Load voices when available
-if (typeof window !== "undefined" && window.speechSynthesis) {
-  window.speechSynthesis.onvoiceschanged = () => {
-    if (selectedVoiceType) setVoiceType(selectedVoiceType);
-  };
+/** speak each word with a tiny gap so toddlers hear every syllable */
+export function saySlow(text: string, lang = "en-US", voiceId?: VoiceId) {
+  if (!settings.voice || typeof window === "undefined" || !window.speechSynthesis) return;
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return say(text, lang, voiceId);
+  window.speechSynthesis.cancel();
+  const char = VOICES.find((v) => v.id === (voiceId ?? voicePref.id)) ?? VOICES[0];
+  const sysVoice = voiceForChar(char, lang);
+  words.forEach((w, i) => {
+    const u = new SpeechSynthesisUtterance(w);
+    u.lang = lang;
+    u.rate = char.rate;
+    u.pitch = char.pitch;
+    if (sysVoice) u.voice = sysVoice;
+    // small breathing gap between words
+    window.setTimeout(() => window.speechSynthesis.speak(u), i * 60);
+  });
 }
 
-export const PRAISE = ["Great job!", "Wonderful!", "Amazing!", "So pretty!", "You did it!", "Fantastic!", "Beautiful!"];
-export const randomPraise = () => PRAISE[Math.floor(Math.random() * PRAISE.length)];
-
-// Interactive companion phrases
-export const COMPANION_PHRASES = {
-  greeting: [
-    "Hi {name}! Ready to create something beautiful?",
-    "Hello {name}! I'm so happy to see you!",
-    "Welcome back {name}! Let's have fun!",
-    "Hey {name}! What shall we color today?",
-  ],
-  encouragement: [
-    "You're doing great {name}!",
-    "I love how you're coloring {name}!",
-    "Keep going {name}, it looks amazing!",
-    "Wow {name}, you're so creative!",
-    "Beautiful choices {name}!",
-  ],
-  completion: [
-    "You finished {name}! I'm so proud of you!",
-    "Look at your masterpiece {name}!",
-    "Amazing work {name}! You're an artist!",
-    "Yay {name}! That's absolutely beautiful!",
-  ],
-  reminder: [
-    "Remember to take breaks {name}!",
-    "Stretch your fingers {name}!",
-    "Blink your eyes {name}!",
-  ],
-  question: [
-    "What's your favorite color {name}?",
-    "Do you like drawing animals {name}?",
-    "Should we try a new picture {name}?",
-    "Are you having fun {name}?",
-  ],
-  morning: [
-    "Good morning {name}! Ready for a colorful day?",
-    "Morning {name}! Let's start with some art!",
-  ],
-  evening: [
-    "Good evening {name}! Time for some relaxing coloring!",
-    "Hi {name}! Ready to unwind with art?",
-  ],
+/** localized praise – so language choice is audible even with one voice */
+const PRAISE_L10N: Record<string, string[]> = {
+  en: ["Great job!", "Wonderful!", "Amazing!", "So pretty!", "You did it!", "Fantastic!", "Beautiful!"],
+  ar: ["أحسنت!", "رائع!", "مذهل!", "جميل جدا!", "لقد نجحت!", "ممتاز!", "عمل رائع!"],
+  fr: ["Bravo!", "Magnifique!", "Incroyable!", "Très joli!", "Tu as réussi!", "Fantastique!", "Superbe!"],
+  de: ["Gut gemacht!", "Wunderbar!", "Fantastisch!", "Sehr schön!", "Du hast es geschafft!", "Toll!", "Wunderschön!"],
+  es: ["¡Buen trabajo!", "¡Maravilloso!", "¡Increíble!", "¡Muy bonito!", "¡Lo lograste!", "¡Fantástico!", "¡Precioso!"],
+  it: ["Bravo!", "Meraviglioso!", "Incredibile!", "Molto bello!", "Ce l'hai fatta!", "Fantastico!", "Bellissimo!"],
+  tr: ["Aferin!", "Harika!", "İnanılmaz!", "Çok güzel!", "Başardın!", "Muhteşem!", "Çok şık!"],
+  ru: ["Молодец!", "Замечательно!", "Потрясающе!", "Очень красиво!", "У тебя получилось!", "Фантастика!", "Прекрасно!"],
+  pt: ["Muito bem!", "Maravilhoso!", "Incrível!", "Muito bonito!", "Você conseguiu!", "Fantástico!", "Lindo!"],
 };
 
-export function getCompanionPhrase(
-  type: keyof typeof COMPANION_PHRASES,
-  name: string,
-  lang: string
-): string {
-  const phrases = COMPANION_PHRASES[type];
-  const phrase = phrases[Math.floor(Math.random() * phrases.length)];
-  return phrase.replace(/{name}/g, name);
+export const PRAISE = PRAISE_L10N.en;
+
+export function randomPraise(lang = "en-US") {
+  const base = lang.split("-")[0].toLowerCase();
+  const list = PRAISE_L10N[base] ?? PRAISE_L10N.en;
+  return list[Math.floor(Math.random() * list.length)];
 }
 
-let lastSpokeAt = 0;
-const SPEAK_COOLDOWN = 8000; // Minimum 8 seconds between auto-phrases
+/** localized welcome/instructions */
+const PHRASES: Record<string, Record<string, string>> = {
+  welcome: {
+    en: "Welcome to Magic Coloring World!",
+    ar: "أهلا بك في عالم التلوين السحري!",
+    fr: "Bienvenue dans le monde magique du coloriage!",
+    de: "Willkommen in der magischen Malwelt!",
+    es: "¡Bienvenido al mundo mágico para colorear!",
+    it: "Benvenuto nel mondo magico dei colori!",
+    tr: "Sihirli Boyama Dünyasına hoş geldin!",
+    ru: "Добро пожаловать в волшебный мир раскрасок!",
+    pt: "Bem-vindo ao mundo mágico de colorir!",
+  },
+  hello: {
+    en: "Hello! Let us color together!",
+    ar: "مرحبا! هيا نلون معا!",
+    fr: "Bonjour! Colorions ensemble!",
+    de: "Hallo! Lass uns zusammen malen!",
+    es: "¡Hola! ¡Vamos a colorear juntos!",
+    it: "Ciao! Coloriamo insieme!",
+    tr: "Merhaba! Hadi birlikte boyayalım!",
+    ru: "Привет! Давай раскрашивать вместе!",
+    pt: "Olá! Vamos colorir juntos!",
+  },
+};
 
-export function canCompanionSpeak(): boolean {
-  return Date.now() - lastSpokeAt > SPEAK_COOLDOWN;
-}
-
-export function companionSpeak(
-  type: keyof typeof COMPANION_PHRASES,
-  name: string,
-  lang: string,
-  force: boolean = false
-) {
-  if (!canCompanionSpeak() && !force) return false;
-  const phrase = getCompanionPhrase(type, name, lang);
-  say(phrase, lang);
-  lastSpokeAt = Date.now();
-  return true;
-}
-
-export function resetCompanionCooldown() {
-  lastSpokeAt = 0;
+export function phrase(key: keyof typeof PHRASES, lang = "en-US") {
+  const base = lang.split("-")[0].toLowerCase();
+  return PHRASES[key][base] ?? PHRASES[key].en;
 }

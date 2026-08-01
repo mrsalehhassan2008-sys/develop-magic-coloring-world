@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import FxLayer from "@/components/FxLayer";
+import SwRegister from "@/components/SwRegister";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <div id="shake-root">{children}</div>
         <FxLayer />
+        <SwRegister />
       </body>
     </html>
   );

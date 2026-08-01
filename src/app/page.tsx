@@ -1,22 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import StudioV2, { PagePreview } from "@/components/StudioV2";
+import Studio, { PagePreview } from "@/components/Studio";
 import BalloonPop from "@/components/BalloonPop";
 import DotsGame from "@/components/DotsGame";
-import { DailyReward, Gallery as OldGallery, LearnMode, ParentArea, TRACE_SETS } from "@/components/Extras";
-import AvatarSelector from "@/components/AvatarSelector";
-import LevelDisplay from "@/components/LevelDisplay";
-import DailyChallenges from "@/components/DailyChallenges";
-import Gallery from "@/components/Gallery";
-import MusicSelector from "@/components/MusicSelector";
-import PremiumShop from "@/components/PremiumShop";
-import { addXP } from "@/lib/progress";
+import { Achievements, DailyReward, Gallery, LearnMode, ParentArea, ProfilePicker, Store, TRACE_SETS, TrophyPopup } from "@/components/Extras";
+import ShadowGame from "@/components/ShadowGame";
+import AvatarDesigner from "@/components/AvatarDesigner";
 import { CATEGORIES } from "@/lib/art/catalog";
 import type { PageArt } from "@/lib/art/shapes";
-import { canCompanionSpeak, companionSpeak, setAudioSetting, setVoiceType, sfx, say, startMusic, stopMusic, unlockAudio } from "@/lib/audio";
+import { phrase, setAudioSetting, setMusicTrack, setVoiceCharacter, sfx, say, saySlow, startMusic, stopMusic, unlockAudio, type VoiceId } from "@/lib/audio";
 import { useProgress } from "@/lib/progress";
 import { fx } from "@/components/FxLayer";
+import Buddy, { buddySpeak } from "@/components/Buddy";
+import { timeGreeting } from "@/lib/buddy";
+import { ACHIEVEMENTS, newlyUnlocked } from "@/lib/achievements";
 
 type View =
   | "home"
@@ -27,8 +25,12 @@ type View =
   | "tracepick"
   | "balloon"
   | "dots"
+  | "shadow"
   | "learn"
   | "gallery"
+  | "trophies"
+  | "store"
+  | "buddy"
   | "parent";
 
 interface PageRow {
@@ -37,14 +39,15 @@ interface PageRow {
   title: string;
   category: string;
   difficulty: number;
+  premium: boolean;
   data: { emoji: string; viewBox: string; shapes: PageArt["shapes"] };
 }
 
 export default function Home() {
-  const { progress, update, reset, ready } = useProgress();
+  const { progress, update, reset, ready, profiles, activeId, addProfile, switchProfile, deleteProfile, importProfile } = useProgress();
   const [view, setView] = useState<View>("home");
   const [started, setStarted] = useState(false);
-  const [category, setCategory] = useState<string>("animals");
+  const [category, setCategory] = useState<string>("scenes");
   const [pages, setPages] = useState<Record<string, PageArt[]>>({});
   const [loading, setLoading] = useState(false);
   const [art, setArt] = useState<PageArt | null>(null);
@@ -53,20 +56,55 @@ export default function Home() {
   const [totals, setTotals] = useState<{ total: number }>({ total: 0 });
   const [gift, setGift] = useState(false);
   const [traceSet, setTraceSet] = useState(0);
-  const [showAvatar, setShowAvatar] = useState(false);
-  const [showChallenges, setShowChallenges] = useState(false);
-  const [showMusic, setShowMusic] = useState(false);
-  const [showGallery, setShowGallery] = useState(false);
-  const [showLevelUp, setShowLevelUp] = useState(false);
-  const [showShop, setShowShop] = useState(false);
-  const [levelUpMsg, setLevelUpMsg] = useState("");
+  const [showProfiles, setShowProfiles] = useState(false);
+  const [trophy, setTrophy] = useState<{ emoji: string; title: string } | null>(null);
+  const [sleeping, setSleeping] = useState(false);
+  const [chest, setChest] = useState(false);
+  const chestSeen = useMemo(() => Math.floor(progress.completed.length / 5), [progress.completed.length]);
 
   useEffect(() => {
     setAudioSetting("sound", progress.sound);
     setAudioSetting("music", progress.music);
     setAudioSetting("voice", progress.voice);
-    setVoiceType(progress.voiceType);
-  }, [progress.sound, progress.music, progress.voice, progress.voiceType]);
+    setVoiceCharacter((progress.voiceChar || "teacher_f") as VoiceId);
+    setMusicTrack(progress.musicTrack || "lullaby");
+  }, [progress.sound, progress.music, progress.voice, progress.voiceChar, progress.musicTrack]);
+
+  // watch for newly unlocked achievements
+  useEffect(() => {
+    if (!ready) return;
+    const fresh = newlyUnlocked(progress);
+    if (fresh.length) {
+      const a = fresh[0];
+      update({ achievements: [...progress.achievements, ...fresh.map((f) => f.id)] });
+      window.setTimeout(() => {
+        setTrophy({ emoji: a.emoji, title: a.title });
+        sfx.reward();
+        fx.confetti(90);
+      }, 700);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progress.completed.length, progress.stars, progress.coins, progress.streak, progress.bestBalloon, progress.bestDots, progress.bestShadow, ready]);
+
+  // treasure chest every 5 finished pictures
+  useEffect(() => {
+    if (!ready) return;
+    if (chestSeen > progress.chestProgress) {
+      window.setTimeout(() => setChest(true), 900);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chestSeen, ready]);
+
+  // sleep timer (parent-controlled): gently ends the session
+  useEffect(() => {
+    if (!started || !progress.sleepMinutes) return;
+    const t = window.setTimeout(() => {
+      stopMusic();
+      setSleeping(true);
+      if (progress.buddyOn) buddySpeak("goodbye");
+    }, progress.sleepMinutes * 60000);
+    return () => window.clearTimeout(t);
+  }, [started, progress.sleepMinutes, progress.buddyOn]);
 
   useEffect(() => {
     fetch("/api/pages")
@@ -83,30 +121,17 @@ export default function Home() {
     setStarted(true);
     sfx.star();
     fx.confetti(60);
-    
-    // Companion greeting
-    if (progress.companionMode && progress.voice) {
-      const hour = new Date().getHours();
-      const type = hour < 12 ? "morning" : hour < 18 ? "greeting" : "evening";
-      companionSpeak(type, progress.name, progress.lang, true);
-    } else {
-      say("Welcome to Magic Coloring World!", progress.lang);
-    }
-    
-    // Check for level up
-    if (progress.level > 1) {
-      setLevelUpMsg(`Welcome back Level ${progress.level} ${progress.name}!`);
-      setShowLevelUp(true);
-      window.setTimeout(() => setShowLevelUp(false), 3000);
-    }
-    
-    // Update daily challenges if needed
-    const todayStr = new Date().toISOString().slice(0, 10);
-    if (progress.dailyChallenges[0]?.date !== todayStr) {
-      // Challenges will be refreshed when opened
-    }
-    
-    if (progress.lastReward !== today) window.setTimeout(() => setGift(true), 900);
+    // buddy greets the child by name — returning visitor vs. first-timer vs. time of day
+    window.setTimeout(() => {
+      if (!progress.buddyOn) {
+        say(phrase("welcome", progress.lang), progress.lang);
+        return;
+      }
+      const returning = progress.completed.length > 0 || progress.streak > 0;
+      buddySpeak(returning ? "welcomeBack" : "welcome");
+      window.setTimeout(() => buddySpeak(timeGreeting()), 4200);
+    }, 500);
+    if (progress.lastReward !== today) window.setTimeout(() => setGift(true), 1400);
   };
 
   useEffect(() => () => stopMusic(), []);
@@ -129,6 +154,7 @@ export default function Home() {
           emoji: p.data.emoji,
           viewBox: p.data.viewBox,
           shapes: p.data.shapes,
+          premium: p.premium,
         }));
         setPages((prev) => ({ ...prev, [key]: arts }));
       } catch {
@@ -167,105 +193,161 @@ export default function Home() {
     );
   }
 
+  const buddyEl = (
+    <Buddy
+      name={progress.name}
+      lang={progress.lang}
+      face={progress.buddyFace}
+      enabled={progress.buddyOn}
+      voice={progress.voice}
+      custom={progress.buddyCustom}
+      pos={progress.buddyPos}
+      onPos={(np) => update({ buddyPos: np })}
+    />
+  );
+
   if (view === "studio" || view === "draw")
     return (
-      <StudioV2
-        art={view === "studio" ? art : null}
-        traceGlyph={view === "draw" ? traceGlyph : undefined}
-        drawMode={drawMode}
-        progress={progress}
-        update={update}
-        onExit={() => {
-          setTraceGlyph(undefined);
-          setView(view === "studio" ? "pages" : "home");
-        }}
-      />
+      <>
+        <Studio
+          art={view === "studio" ? art : null}
+          traceGlyph={view === "draw" ? traceGlyph : undefined}
+          drawMode={drawMode}
+          progress={progress}
+          update={update}
+          onNeedPremium={() => setView("store")}
+          onCoopJoin={(p) => setArt(p)}
+          onExit={() => {
+            setTraceGlyph(undefined);
+            setView(view === "studio" ? "pages" : "home");
+          }}
+        />
+        {buddyEl}
+      </>
     );
   if (view === "balloon") return <BalloonPop onExit={() => setView("home")} progress={progress} update={update} />;
-  if (view === "dots") return <DotsGame onExit={() => setView("home")} progress={progress} update={update} />;
-  if (view === "learn") return <LearnMode onExit={() => setView("home")} lang={progress.lang} />;
-  if (view === "gallery") return <Gallery onExit={() => setShowGallery(false)} />;
+  if (view === "dots")
+    return (
+      <>
+        <DotsGame onExit={() => setView("home")} progress={progress} update={update} />
+        {buddyEl}
+      </>
+    );
+  if (view === "learn")
+    return (
+      <>
+        <LearnMode onExit={() => setView("home")} lang={progress.lang} />
+        {buddyEl}
+      </>
+    );
+  if (view === "gallery")
+    return (
+      <>
+        <Gallery onExit={() => setView("home")} />
+        {buddyEl}
+      </>
+    );
+  if (view === "shadow")
+    return (
+      <>
+        <ShadowGame onExit={() => setView("home")} progress={progress} update={update} />
+        {buddyEl}
+      </>
+    );
+  if (view === "trophies")
+    return (
+      <>
+        <Achievements onExit={() => setView("home")} progress={progress} />
+        {buddyEl}
+      </>
+    );
+  if (view === "buddy")
+    return (
+      <>
+        <AvatarDesigner onExit={() => setView("home")} progress={progress} update={update} />
+        {buddyEl}
+      </>
+    );
+  if (view === "store")
+    return <Store onExit={() => setView("home")} progress={progress} update={update} />;
   if (view === "parent")
-    return <ParentArea onExit={() => setView("home")} progress={progress} update={update} reset={reset} />;
+    return (
+      <ParentArea
+        onExit={() => setView("home")}
+        progress={progress}
+        update={update}
+        reset={reset}
+        onManageProfiles={() => setShowProfiles(true)}
+      />
+    );
 
   return (
     <main className="relative min-h-[100dvh] overflow-x-hidden bg-[linear-gradient(160deg,#FFF0F8,#EAF5FF_50%,#FFF8E6)] pb-8">
       <Bubbles />
       {gift && <DailyReward progress={progress} update={update} onClose={() => setGift(false)} />}
-      {showAvatar && <AvatarSelector progress={progress} update={update} onClose={() => setShowAvatar(false)} />}
-      {showChallenges && <DailyChallenges progress={progress} update={update} onClose={() => setShowChallenges(false)} />}
-      {showMusic && <MusicSelector progress={progress} update={update} onClose={() => setShowMusic(false)} />}
-      {showGallery && <Gallery onExit={() => setShowGallery(false)} />}
-      {showShop && <PremiumShop progress={progress} update={update} onClose={() => setShowShop(false)} />}
 
       {/* HUD */}
-      <header className="relative z-10 flex flex-col gap-2 p-3">
-        <div className="flex items-center gap-2">
-          {/* Avatar */}
-          <button
-            onClick={() => setShowAvatar(true)}
-            className="flex items-center gap-2 rounded-full bg-white/85 px-3 py-1.5 shadow active:scale-95"
-          >
-            <span className="text-2xl">{progress.avatar === "boy1" ? "👦" : progress.avatar === "girl1" ? "👧" : progress.avatar === "fox" ? "🦊" : progress.avatar === "rabbit" ? "🐰" : progress.avatar === "lion" ? "🦁" : progress.avatar === "panda" ? "🐼" : progress.avatar === "unicorn" ? "🦄" : progress.avatar === "bear" ? "🐻" : "👨"}</span>
-            <span className="font-black text-[#5B4B7A]">{progress.name}</span>
-          </button>
-          
-          {/* Level Display */}
-          <div className="flex-1">
-            <LevelDisplay
-              progress={progress}
-              update={(p) => {
-                update(p);
-              }}
-              onLevelUp={(newLevel) => {
-                setLevelUpMsg(`🎉 Level ${newLevel}!`);
-                setShowLevelUp(true);
-                window.setTimeout(() => setShowLevelUp(false), 3000);
-              }}
-            />
-          </div>
-          
-          <div className="flex items-center gap-1 rounded-full bg-white/85 px-3 py-1.5 font-black text-[#5B4B7A] shadow">
-            ⭐ {progress.stars}
-          </div>
-          <div className="flex items-center gap-1 rounded-full bg-white/85 px-3 py-1.5 font-black text-[#5B4B7A] shadow">
-            🪙 {progress.coins}
-          </div>
+      <header className="relative z-10 flex items-center gap-2 overflow-x-auto p-3">
+        <button
+          onClick={() => {
+            setShowProfiles(true);
+            sfx.tap();
+          }}
+          className="flex shrink-0 items-center gap-1 rounded-full bg-white/85 px-2 py-1 font-black text-[#5B4B7A] shadow active:scale-95"
+          aria-label="Switch kid"
+        >
+          <span className="text-xl">{progress.avatar}</span>
+          <span className="max-w-[64px] truncate text-sm">{progress.name}</span>
+        </button>
+        <div className="flex shrink-0 items-center gap-1 rounded-full bg-white/85 px-3 py-1.5 font-black text-[#5B4B7A] shadow">
+          ⭐ {progress.stars}
         </div>
-        
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 rounded-full bg-white/85 px-3 py-1.5 font-black text-[#5B4B7A] shadow">
+          🪙 {progress.coins}
+        </div>
+        <div className="ml-auto flex shrink-0 gap-2">
+          {!progress.premiumUnlocked && (
+            <button
+              onClick={() => {
+                setView("store");
+                sfx.tap();
+              }}
+              className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-b from-[#FFE9A8] to-[#FFB03A] text-2xl shadow ring-2 ring-[#FFD84D] active:scale-90"
+              aria-label="Premium store"
+            >
+              👑
+            </button>
+          )}
           <button
-            onClick={() => setShowShop(true)}
-            className="flex items-center gap-1 rounded-full bg-gradient-to-r from-[#8E7CFF] to-[#B49BE0] px-4 py-1.5 font-black text-white shadow active:scale-95"
-          >
-            🛒 Shop
-          </button>
-          <button
-            onClick={() => setShowChallenges(true)}
-            className="flex items-center gap-1 rounded-full bg-gradient-to-r from-[#FFD84D] to-[#FFB03A] px-3 py-1.5 font-black text-white shadow active:scale-95"
-          >
-            📅 Challenges
-          </button>
-          <button
-            onClick={() => setShowMusic(true)}
+            onClick={() => {
+              setView("trophies");
+              sfx.tap();
+            }}
             className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-2xl shadow active:scale-90"
-            aria-label="Music"
+            aria-label="Trophies"
           >
-            🎵
+            🏆
           </button>
           <button
-            onClick={() => setShowGallery(true)}
-            className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-2xl shadow active:scale-90"
-            aria-label="Gallery"
-          >
-            🖼️
-          </button>
-          <button
-            onClick={() => setGift(true)}
+            onClick={() => {
+              setGift(true);
+              sfx.tap();
+            }}
             className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-2xl shadow active:scale-90"
             aria-label="Daily gift"
           >
             🎁
+          </button>
+          <button
+            onClick={() => {
+              update({ music: !progress.music });
+              if (progress.music) stopMusic();
+              else startMusic();
+            }}
+            className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-2xl shadow active:scale-90"
+            aria-label="Music"
+          >
+            {progress.music ? "🎵" : "🔇"}
           </button>
           <button
             onClick={() => setView("parent")}
@@ -276,13 +358,6 @@ export default function Home() {
           </button>
         </div>
       </header>
-      
-      {/* Level Up Celebration */}
-      {showLevelUp && (
-        <div className="pointer-events-none fixed top-20 left-1/2 z-[80] -translate-x-1/2 animate-[popIn_0.5s_ease-out] rounded-3xl bg-gradient-to-r from-[#FFD84D] via-[#FF7FB6] to-[#7ED087] px-8 py-4 text-2xl font-black text-white shadow-2xl">
-          {levelUpMsg} 🎉
-        </div>
-      )}
 
       {view === "home" && (
         <div className="relative z-10 mx-auto max-w-4xl px-3">
@@ -290,7 +365,7 @@ export default function Home() {
             Hi {progress.name}! What shall we play? 🌈
           </h1>
           <div className={`mt-4 grid gap-3 ${big ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
-            <Tile emoji="🎨" label="Coloring" tone="#FF7FB6" onClick={() => setView("categories")} big />
+            <Tile emoji="🎨" label="Coloring" tone="#FF7FB6" onClick={() => { setView("categories"); buddySpeak("pickColor"); }} big />
             <Tile
               emoji="✏️"
               label="Free Draw"
@@ -305,6 +380,9 @@ export default function Home() {
             <Tile emoji="✍️" label="Trace" tone="#8E7CFF" onClick={() => setView("tracepick")} />
             <Tile emoji="🎈" label="Balloon Pop" tone="#FF5C7A" onClick={() => setView("balloon")} />
             <Tile emoji="🔢" label="Dot to Dot" tone="#FFB03A" onClick={() => setView("dots")} />
+            <Tile emoji="🌑" label="Shadow Match" tone="#6C7BD6" onClick={() => setView("shadow")} />
+            <Tile emoji="🏆" label="Trophies" tone="#FFD84D" onClick={() => setView("trophies")} />
+            <Tile emoji="🎭" label="My Buddy" tone="#FF9FC4" onClick={() => setView("buddy")} />
             <Tile emoji="🎓" label="Learn" tone="#7ED087" onClick={() => setView("learn")} />
             <Tile emoji="🖼️" label="My Gallery" tone="#38C6D9" onClick={() => setView("gallery")} />
             <Tile
@@ -331,18 +409,6 @@ export default function Home() {
           <p className="mt-5 text-center text-xs font-bold text-[#A99CC4]">
             {progress.completed.length} pages finished · Balloon best {progress.bestBalloon} · Dots reached #{progress.bestDots}
           </p>
-          
-          {/* Companion check-in after completing pages */}
-          {progress.completed.length > 0 && progress.completed.length % 5 === 0 && progress.companionMode && (
-            <div className="mt-4 rounded-3xl bg-gradient-to-r from-[#FFD84D] to-[#FFB03A] p-4 text-center shadow-lg">
-              <p className="text-lg font-black text-[#5B4B7A]">
-                🌟 Wow {progress.name}! You finished {progress.completed.length} pages!
-              </p>
-              <p className="text-sm font-bold text-[#8A6A1F]">
-                You're an amazing artist! Keep creating! 🎨
-              </p>
-            </div>
-          )}
         </div>
       )}
 
@@ -350,43 +416,17 @@ export default function Home() {
         <div className="relative z-10 mx-auto max-w-4xl px-3">
           <TopBar title="🎨 Pick a picture book" onBack={() => setView("home")} />
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-            {CATEGORIES.map((c) => {
-              const isPremium = c.premium ?? false;
-              const isUnlocked = isPremium ? progress.purchases.some(p => 
-                p === `${c.key}-pack` || p === "mega-pack" || p === "all-access"
-              ) : true;
-              
-              return (
-                <button
-                  key={c.key}
-                  onClick={() => {
-                    if (!isUnlocked) {
-                      sfx.wrong();
-                      fx.shake(10);
-                      setShowShop(true);
-                      return;
-                    }
-                    void loadCategory(c.key);
-                  }}
-                  className={`relative rounded-[28px] p-4 shadow-lg transition hover:-translate-y-1 active:scale-95 ${
-                    isUnlocked ? "bg-white" : "bg-[#F7F3FF] opacity-70"
-                  }`}
-                  style={{ boxShadow: isUnlocked ? `0 10px 24px ${c.color}44` : undefined }}
-                >
-                  <div className="text-5xl">{c.emoji}</div>
-                  <div className="mt-1 text-sm font-black text-[#5B4B7A]">{c.label}</div>
-                  {!isUnlocked && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-[28px] bg-[#2E2545]/60 backdrop-blur-sm">
-                      <span className="text-4xl">🔒</span>
-                      <span className="mt-1 text-xs font-black text-white">Premium</span>
-                    </div>
-                  )}
-                  {isPremium && isUnlocked && (
-                    <span className="absolute top-2 right-2 text-sm">⭐</span>
-                  )}
-                </button>
-              );
-            })}
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.key}
+                onClick={() => void loadCategory(c.key)}
+                className="rounded-[28px] bg-white p-4 shadow-lg transition hover:-translate-y-1 active:scale-95"
+                style={{ boxShadow: `0 10px 24px ${c.color}44` }}
+              >
+                <div className="text-5xl">{c.emoji}</div>
+                <div className="mt-1 text-sm font-black text-[#5B4B7A]">{c.label}</div>
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -399,24 +439,53 @@ export default function Home() {
           />
           {loading && <p className="mt-6 text-center font-black text-[#B7A9D4]">Loading pictures…</p>}
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {(pages[category] ?? []).map((p) => (
-              <button
-                key={p.slug}
-                onClick={() => {
-                  setArt(p);
-                  setView("studio");
-                  sfx.tap();
-                  say(p.title, progress.lang);
-                }}
-                className="relative overflow-hidden rounded-[26px] bg-white p-2 shadow-lg transition hover:-translate-y-1 active:scale-95"
-              >
-                <PagePreview art={p} className="aspect-square w-full" />
-                <div className="mt-1 truncate text-xs font-black text-[#5B4B7A]">{p.title}</div>
-                {progress.completed.includes(p.slug) && (
-                  <span className="absolute top-2 right-2 text-xl drop-shadow">⭐</span>
-                )}
-              </button>
-            ))}
+            {(pages[category] ?? []).map((p) => {
+              const locked = !!p.premium && !progress.premiumUnlocked;
+              return (
+                <button
+                  key={p.slug}
+                  onClick={() => {
+                    if (locked) {
+                      setView("store");
+                      sfx.tap();
+                      return;
+                    }
+                    setArt(p);
+                    setView("studio");
+                    sfx.tap();
+                    saySlow(p.title, progress.lang);
+                    window.setTimeout(() => buddySpeak("encourage"), 1600);
+                  }}
+                  className="relative overflow-hidden rounded-[26px] bg-white p-2 shadow-lg transition hover:-translate-y-1 active:scale-95"
+                >
+                  <div className={locked ? "opacity-60" : ""}>
+                    <PagePreview
+                      art={p}
+                      className={category === "scenes" ? "aspect-[4/3] w-full rounded-2xl bg-white" : "aspect-square w-full"}
+                    />
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-1">
+                    <span className="truncate text-xs font-black text-[#5B4B7A]">{p.title}</span>
+                    <span className="shrink-0 text-[10px]">{"⭐".repeat(p.difficulty)}</span>
+                  </div>
+                  {locked && (
+                    <span className="absolute inset-0 grid place-items-center">
+                      <span className="grid h-12 w-12 place-items-center rounded-full bg-[#FFD84D] text-2xl shadow-lg ring-4 ring-white">
+                        🔒
+                      </span>
+                    </span>
+                  )}
+                  {locked && (
+                    <span className="absolute top-2 right-2 rounded-full bg-[#FFB03A] px-2 py-0.5 text-[9px] font-black text-white shadow">
+                      👑 PRO
+                    </span>
+                  )}
+                  {!locked && progress.completed.includes(p.slug) && (
+                    <span className="absolute top-2 right-2 text-xl drop-shadow">✅</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -456,6 +525,66 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {showProfiles && (
+        <ProfilePicker
+          profiles={profiles}
+          activeId={activeId}
+          onSwitch={switchProfile}
+          onAdd={addProfile}
+          onDelete={deleteProfile}
+          onRestore={importProfile}
+          onClose={() => setShowProfiles(false)}
+        />
+      )}
+
+      {trophy && <TrophyPopup emoji={trophy.emoji} title={trophy.title} onClose={() => setTrophy(null)} />}
+
+      {chest && (
+        <div className="fixed inset-0 z-[68] grid place-items-center bg-[#2E2545]/70 p-4">
+          <div className="w-full max-w-xs rounded-[32px] bg-gradient-to-b from-[#FFF6DC] to-white p-6 text-center shadow-2xl pop-in">
+            <p className="text-xs font-black uppercase tracking-widest text-[#FFB03A]">Treasure chest!</p>
+            <button
+              onClick={() => {
+                const coins = 25;
+                const stars = 3;
+                update({ coins: progress.coins + coins, stars: progress.stars + stars, chestProgress: chestSeen });
+                sfx.reward();
+                fx.confetti(160);
+                fx.shake(10);
+                if (progress.buddyOn) buddySpeak("praise");
+                setChest(false);
+              }}
+              className="my-2 text-8xl transition active:scale-90"
+              aria-label="Open chest"
+            >
+              🧰
+            </button>
+            <p className="text-sm font-black text-[#7A6C99]">Tap to open your reward!</p>
+            <p className="mt-1 text-xs font-bold text-[#A99CC4]">🪙 25 coins · ⭐ 3 stars</p>
+          </div>
+        </div>
+      )}
+
+      {sleeping && (
+        <div className="fixed inset-0 z-[90] grid place-items-center bg-[#1A1330]/90 p-6 text-center backdrop-blur-md">
+          <div>
+            <div className="text-7xl">🌙</div>
+            <h2 className="mt-3 text-2xl font-black text-white">Time to rest, {progress.name}!</h2>
+            <p className="mt-1 text-sm font-bold text-[#C7BEE8]">Great coloring today. See you soon! 💤</p>
+            <button
+              onClick={() => {
+                setSleeping(false);
+                if (progress.music) startMusic();
+              }}
+              className="mt-6 rounded-full bg-white/20 px-8 py-3 font-black text-white active:scale-95"
+            >
+              Keep playing (5 min)
+            </button>
+          </div>
+        </div>
+      )}
+      {buddyEl}
     </main>
   );
 }

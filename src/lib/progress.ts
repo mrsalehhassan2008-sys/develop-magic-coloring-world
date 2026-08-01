@@ -2,38 +2,28 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-export type AvatarType = "boy1" | "boy2" | "girl1" | "girl2" | "fox" | "rabbit" | "lion" | "panda" | "unicorn" | "bear";
-
-export interface DailyChallenge {
-  id: string;
-  type: "color" | "numbers" | "game" | "learn";
-  target: number;
-  current: number;
-  reward: { stars: number; coins: number };
-  completed: boolean;
-  date: string;
-}
-
-export interface WeeklyReport {
-  weekStart: string;
-  pagesCompleted: number;
-  gamesPlayed: number;
-  starsEarned: number;
-  timeSpent: number; // minutes
-  favoriteCategory: string;
+/** the child-designed buddy look (animal OR human kid) */
+export interface BuddyCustom {
+  kind?: "animal" | "boy" | "girl";
+  ear: "round" | "pointy" | "long" | "floppy";
+  fur: string;
+  belly: string;
+  skin?: string;
+  hair?: string;
+  hairStyle?: "short" | "long" | "pony" | "curly";
+  shirt?: string;
+  cheeks: boolean;
+  accessory: "none" | "crown" | "bow" | "glasses" | "party";
 }
 
 export interface Progress {
   name: string;
-  avatar: AvatarType;
+  avatar: string;
   stars: number;
   coins: number;
-  level: number;
-  xp: number;
-  xpToNext: number;
   completed: string[];
   unlocked: string[];
-  purchases: string[]; // ['premium-animals', 'all-access', 'remove-ads']
+  achievements: string[];
   lastReward: string | null;
   streak: number;
   leftHanded: boolean;
@@ -42,33 +32,42 @@ export interface Progress {
   lang: string;
   sound: boolean;
   music: boolean;
-  musicTrack: number;
+  musicTrack: string;
   voice: boolean;
-  voiceType: "teacher-male" | "teacher-female" | "kid-boy" | "kid-girl" | "friendly";
-  companionMode: boolean;
-  companionVolume: number;
+  voiceChar: string;
+  buddyOn: boolean;
+  buddyFace: string;
+  buddyCustom: BuddyCustom | null;
+  buddyPos: { x: number; y: number } | null;
+  /** cloud sync code — enter it on any device to restore this child */
+  syncCode: string;
+  premiumUnlocked: boolean;
   bestBalloon: number;
   bestDots: number;
-  darkMode: boolean;
-  dailyChallenges: DailyChallenge[];
-  weeklyReports: WeeklyReport[];
-  hallOfFame: { category: string; value: number; date: string }[];
-  totalPlayTime: number; // minutes
-  lastPlayDate: string | null;
+  bestShadow: number;
+  seenHint: boolean;
+  chestProgress: number;
+  sleepMinutes: number;
 }
 
-const KEY = "mcw.progress.v1";
+export interface Profile {
+  id: string;
+  data: Progress;
+}
+
+const ROOT_KEY = "mcw.profiles.v2";
+const LEGACY_KEY = "mcw.progress.v1";
+
+export const AVATARS = ["🦄", "🐱", "🐶", "🦊", "🐼", "🐵", "🦁", "🐸", "🐰", "🐯", "🐨", "🐧"];
 
 export const DEFAULT_PROGRESS: Progress = {
   name: "Artist",
-  avatar: "boy1" as AvatarType,
+  avatar: "🦄",
   stars: 0,
   coins: 30,
-  level: 1,
-  xp: 0,
-  xpToNext: 100,
   completed: [],
   unlocked: ["brush", "bucket", "crayon", "marker", "pencil", "eraser"],
+  achievements: [],
   lastReward: null,
   streak: 0,
   leftHanded: false,
@@ -77,158 +76,198 @@ export const DEFAULT_PROGRESS: Progress = {
   lang: "en-US",
   sound: true,
   music: true,
-  musicTrack: 0,
+  musicTrack: "lullaby",
   voice: true,
-  voiceType: "friendly" as const,
-  companionMode: true,
-  companionVolume: 0.7,
-  purchases: [],
+  voiceChar: "teacher_f",
+  buddyOn: true,
+  buddyFace: "🦊",
+  buddyCustom: null,
+  buddyPos: null,
+  syncCode: "",
+  premiumUnlocked: false,
   bestBalloon: 0,
   bestDots: 0,
-  darkMode: false,
-  dailyChallenges: [],
-  weeklyReports: [],
-  hallOfFame: [],
-  totalPlayTime: 0,
-  lastPlayDate: null,
+  bestShadow: 0,
+  seenHint: false,
+  chestProgress: 0,
+  sleepMinutes: 0,
 };
 
-/** lightweight obfuscation so kids/tampering can't trivially edit stars */
-function encode(p: Progress) {
-  const json = JSON.stringify(p);
+interface Store {
+  activeId: string;
+  profiles: Profile[];
+}
+
+function encode(s: Store) {
+  const json = JSON.stringify(s);
   if (typeof window === "undefined") return json;
   return window.btoa(encodeURIComponent(json));
 }
-function decode(raw: string): Progress | null {
+function decode(raw: string): Store | null {
   try {
     const json = raw.startsWith("{") ? raw : decodeURIComponent(window.atob(raw));
-    return { ...DEFAULT_PROGRESS, ...(JSON.parse(json) as Progress) };
+    return JSON.parse(json) as Store;
   } catch {
     return null;
   }
 }
 
-export function loadProgress(): Progress {
-  if (typeof window === "undefined") return DEFAULT_PROGRESS;
-  const raw = window.localStorage.getItem(KEY);
-  return (raw && decode(raw)) || DEFAULT_PROGRESS;
+const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function makeSyncCode() {
+  let c = "";
+  for (let i = 0; i < 6; i++) c += CODE_CHARS[(Math.random() * CODE_CHARS.length) | 0];
+  return c;
 }
 
-export function saveProgress(p: Progress) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(KEY, encode(p));
-}
-
-export function addXP(p: Progress, amount: number): Progress {
-  let newXp = p.xp + amount;
-  let newLevel = p.level;
-  let newXpToNext = p.xpToNext;
-  
-  // Level up logic
-  while (newXp >= newXpToNext) {
-    newXp -= newXpToNext;
-    newLevel++;
-    newXpToNext = Math.round(newXpToNext * 1.2); // Each level needs 20% more XP
-  }
-  
+function freshProfile(name = "Artist", avatar = "🦄"): Profile {
   return {
-    ...p,
-    xp: newXp,
-    level: newLevel,
-    xpToNext: newXpToNext,
+    id: `p${Date.now()}${Math.floor(Math.random() * 999)}`,
+    data: { ...DEFAULT_PROGRESS, name, avatar, syncCode: makeSyncCode() },
   };
 }
 
-export function generateDailyChallenges(): DailyChallenge[] {
-  const today = new Date().toISOString().slice(0, 10);
-  return [
-    {
-      id: `daily-${today}-1`,
-      type: "color",
-      target: 3,
-      current: 0,
-      reward: { stars: 5, coins: 15 },
-      completed: false,
-      date: today,
-    },
-    {
-      id: `daily-${today}-2`,
-      type: "numbers",
-      target: 1,
-      current: 0,
-      reward: { stars: 10, coins: 25 },
-      completed: false,
-      date: today,
-    },
-    {
-      id: `daily-${today}-3`,
-      type: "game",
-      target: 500, // balloon score
-      current: 0,
-      reward: { stars: 8, coins: 20 },
-      completed: false,
-      date: today,
-    },
-  ];
-}
-
-export function refreshChallengesIfNeeded(p: Progress): Progress {
-  const today = new Date().toISOString().slice(0, 10);
-  const lastChallengeDate = p.dailyChallenges[0]?.date;
-  
-  if (lastChallengeDate !== today) {
-    return {
-      ...p,
-      dailyChallenges: generateDailyChallenges(),
-    };
+function loadStore(): Store {
+  if (typeof window === "undefined") {
+    const p = freshProfile();
+    return { activeId: p.id, profiles: [p] };
   }
-  return p;
+  const raw = window.localStorage.getItem(ROOT_KEY);
+  const parsed = raw && decode(raw);
+  if (parsed && parsed.profiles?.length) {
+    // hydrate any missing fields on older profiles
+    parsed.profiles = parsed.profiles.map((p) => ({ ...p, data: { ...DEFAULT_PROGRESS, ...p.data } }));
+    return parsed;
+  }
+  // migrate the old single-profile save
+  const legacy = window.localStorage.getItem(LEGACY_KEY);
+  if (legacy) {
+    try {
+      const json = legacy.startsWith("{") ? legacy : decodeURIComponent(window.atob(legacy));
+      const data = { ...DEFAULT_PROGRESS, ...(JSON.parse(json) as Progress) };
+      const p: Profile = { id: `p${Date.now()}`, data };
+      return { activeId: p.id, profiles: [p] };
+    } catch {
+      /* ignore */
+    }
+  }
+  const p = freshProfile();
+  return { activeId: p.id, profiles: [p] };
 }
 
-export const AVATARS: { id: AvatarType; emoji: string; label: string }[] = [
-  { id: "boy1", emoji: "👦", label: "Boy 1" },
-  { id: "boy2", emoji: "👨", label: "Boy 2" },
-  { id: "girl1", emoji: "👧", label: "Girl 1" },
-  { id: "girl2", emoji: "👩", label: "Girl 2" },
-  { id: "fox", emoji: "🦊", label: "Fox" },
-  { id: "rabbit", emoji: "🐰", label: "Rabbit" },
-  { id: "lion", emoji: "🦁", label: "Lion" },
-  { id: "panda", emoji: "🐼", label: "Panda" },
-  { id: "unicorn", emoji: "🦄", label: "Unicorn" },
-  { id: "bear", emoji: "🐻", label: "Bear" },
-];
-
-export const MUSIC_TRACKS = [
-  { id: 0, name: "🎵 Gentle Piano", emoji: "🎹" },
-  { id: 1, name: "🎵 Happy Ukulele", emoji: "🎸" },
-  { id: 2, name: "🎵 Calm Flute", emoji: "🎼" },
-  { id: 3, name: "🎵 Soft Strings", emoji: "🎻" },
-];
+function saveStore(s: Store) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ROOT_KEY, encode(s));
+}
 
 export function useProgress() {
-  const [progress, setProgress] = useState<Progress>(DEFAULT_PROGRESS);
+  const [store, setStore] = useState<Store | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setProgress(loadProgress());
+    setStore(loadStore());
     setReady(true);
   }, []);
 
+  const active = store?.profiles.find((p) => p.id === store.activeId) ?? null;
+  const progress = active?.data ?? DEFAULT_PROGRESS;
+
+  // cloud auto-save: push this child's progress to the server (debounced)
+  useEffect(() => {
+    if (!ready || !progress.syncCode) return;
+    const t = window.setTimeout(() => {
+      fetch("/api/progress", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: progress.syncCode, data: progress }),
+      }).catch(() => undefined);
+    }, 2000);
+    return () => window.clearTimeout(t);
+  }, [progress, ready]);
+
   const update = useCallback((patch: Partial<Progress> | ((p: Progress) => Partial<Progress>)) => {
-    setProgress((prev) => {
-      const delta = typeof patch === "function" ? patch(prev) : patch;
-      const next = { ...prev, ...delta };
-      saveProgress(next);
+    setStore((prev) => {
+      if (!prev) return prev;
+      const next: Store = {
+        ...prev,
+        profiles: prev.profiles.map((p) => {
+          if (p.id !== prev.activeId) return p;
+          const delta = typeof patch === "function" ? patch(p.data) : patch;
+          return { ...p, data: { ...p.data, ...delta } };
+        }),
+      };
+      saveStore(next);
       return next;
     });
   }, []);
 
   const reset = useCallback(() => {
-    saveProgress(DEFAULT_PROGRESS);
-    setProgress(DEFAULT_PROGRESS);
+    setStore((prev) => {
+      if (!prev) return prev;
+      const next: Store = {
+        ...prev,
+        profiles: prev.profiles.map((p) =>
+          p.id === prev.activeId ? { ...p, data: { ...DEFAULT_PROGRESS, name: p.data.name, avatar: p.data.avatar } } : p,
+        ),
+      };
+      saveStore(next);
+      return next;
+    });
   }, []);
 
-  return { progress, update, reset, ready };
+  const addProfile = useCallback((name: string, avatar: string) => {
+    setStore((prev) => {
+      const base = prev ?? loadStore();
+      if (base.profiles.length >= 4) return base;
+      const p = freshProfile(name || "Artist", avatar);
+      const next: Store = { activeId: p.id, profiles: [...base.profiles, p] };
+      saveStore(next);
+      return next;
+    });
+  }, []);
+
+  const switchProfile = useCallback((id: string) => {
+    setStore((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, activeId: id };
+      saveStore(next);
+      return next;
+    });
+  }, []);
+
+  /** import a profile restored from the cloud (by sync code) */
+  const importProfile = useCallback((data: Progress) => {
+    setStore((prev) => {
+      const base = prev ?? loadStore();
+      const d: Progress = { ...DEFAULT_PROGRESS, ...data, syncCode: data.syncCode || makeSyncCode() };
+      const p: Profile = { id: `p${Date.now()}`, data: d };
+      const next: Store = { activeId: p.id, profiles: [...base.profiles, p] };
+      saveStore(next);
+      return next;
+    });
+  }, []);
+
+  const deleteProfile = useCallback((id: string) => {
+    setStore((prev) => {
+      if (!prev || prev.profiles.length <= 1) return prev;
+      const profiles = prev.profiles.filter((p) => p.id !== id);
+      const next: Store = { activeId: prev.activeId === id ? profiles[0].id : prev.activeId, profiles };
+      saveStore(next);
+      return next;
+    });
+  }, []);
+
+  return {
+    progress,
+    update,
+    reset,
+    ready,
+    profiles: store?.profiles ?? [],
+    activeId: store?.activeId ?? "",
+    addProfile,
+    switchProfile,
+    deleteProfile,
+    importProfile,
+  };
 }
 
 export const LANGS = [

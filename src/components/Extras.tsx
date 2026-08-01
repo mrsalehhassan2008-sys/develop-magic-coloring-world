@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fx } from "@/components/FxLayer";
-import { say, setAudioSetting, setVoiceType, type VoiceType, sfx } from "@/lib/audio";
-import { LANGS, type Progress } from "@/lib/progress";
+import { availableVoiceCount, MUSIC_TRACKS, phrase, say, setAudioSetting, setMusicTrack, setVoiceCharacter, sfx, VOICES, type VoiceId } from "@/lib/audio";
+import { BUDDY_FACES, buddyLine } from "@/lib/buddy";
+import { ACHIEVEMENTS } from "@/lib/achievements";
+import { AVATARS, LANGS, type Profile, type Progress } from "@/lib/progress";
 
 /* ============================== LEARN MODE ============================== */
 
@@ -203,11 +205,13 @@ export function ParentArea({
   progress,
   update,
   reset,
+  onManageProfiles,
 }: {
   onExit: () => void;
   progress: Progress;
   update: (p: Partial<Progress>) => void;
   reset: () => void;
+  onManageProfiles: () => void;
 }) {
   const [challenge] = useState(() => ({ a: 3 + Math.floor(Math.random() * 7), b: 4 + Math.floor(Math.random() * 8) }));
   const [answer, setAnswer] = useState("");
@@ -276,48 +280,61 @@ export function ParentArea({
               <Switch on={progress[k]} onChange={(v) => toggle(k, v)} />
             </Row>
           ))}
-          <Row label="Voice type">
-            <select
-              value={progress.voiceType}
-              onChange={(e) => {
-                update({ voiceType: e.target.value as VoiceType });
-                setVoiceType(e.target.value as VoiceType);
-                say("Hello! I am your friend!", progress.lang);
-              }}
-              className="rounded-xl border-2 border-[#EDE6FF] px-3 py-2 text-sm font-black text-[#2E2545] outline-none focus:border-[#8E7CFF]"
-            >
-              <option value="friendly">🌟 Friendly</option>
-              <option value="teacher-male">👨‍🏫 Teacher (Male)</option>
-              <option value="teacher-female">👩‍🏫 Teacher (Female)</option>
-              <option value="kid-boy">👦 Kid Boy</option>
-              <option value="kid-girl">👧 Kid Girl</option>
-            </select>
-          </Row>
-          <Row label="🗣️ Talking Companion">
-            <Switch
-              on={progress.companionMode}
-              onChange={(v) => {
-                update({ companionMode: v });
-                if (v) {
-                  say(`Hello ${progress.name}! I'm your art buddy!`, progress.lang);
-                }
-              }}
-            />
-          </Row>
-          {progress.companionMode && (
-            <Row label="Companion volume">
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.1}
-                value={progress.companionVolume}
-                onChange={(e) => update({ companionVolume: Number(e.target.value) })}
-                className="w-32 accent-[#FFB03A]"
-                aria-label="Companion volume"
-              />
-            </Row>
+        </Card>
+
+        <Card title="🗣️ Choose a voice">
+          <p className="mb-1 text-xs font-bold text-[#7A6C99]">Pick who talks to your child. Tap to hear it.</p>
+          {availableVoiceCount(progress.lang) === 0 && (
+            <p className="mb-2 rounded-xl bg-[#FFF3CC] px-3 py-2 text-[11px] font-bold text-[#8A6A1F]">
+              ⚠️ Your device has no speech voice for this language. The characters still sound different (pitch),
+              but for real voices install a text-to-speech voice pack for this language in your device settings.
+            </p>
           )}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {VOICES.map((v) => (
+              <button
+                key={v.id}
+                onClick={() => {
+                  update({ voiceChar: v.id });
+                  setVoiceCharacter(v.id as VoiceId);
+                  say(phrase("hello", progress.lang), progress.lang, v.id as VoiceId);
+                  sfx.tap();
+                }}
+                className={`rounded-2xl p-3 text-center shadow transition active:scale-95 ${
+                  progress.voiceChar === v.id ? "bg-[#8E7CFF] text-white ring-4 ring-[#FFD84D]" : "bg-[#F3EFFF] text-[#5B4B7A]"
+                }`}
+              >
+                <div className="text-4xl">{v.emoji}</div>
+                <div className="mt-1 text-xs font-black">{v.label}</div>
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <Card title="🧸 Talking buddy">
+          <p className="mb-1 text-xs font-bold text-[#7A6C99]">
+            A friendly companion that talks to {progress.name || "your child"} by name and encourages them.
+          </p>
+          <Row label="Enable buddy">
+            <Switch on={progress.buddyOn} onChange={(v) => update({ buddyOn: v })} />
+          </Row>
+          <div className="mt-1 grid grid-cols-4 gap-2 sm:grid-cols-8">
+            {BUDDY_FACES.map((f) => (
+              <button
+                key={f}
+                onClick={() => {
+                  update({ buddyFace: f });
+                  say(buddyLine("praise", progress.name, progress.lang), progress.lang);
+                  sfx.tap();
+                }}
+                className={`grid h-12 place-items-center rounded-2xl text-3xl shadow transition active:scale-90 ${
+                  progress.buddyFace === f ? "bg-[#8E7CFF] ring-4 ring-[#FFD84D]" : "bg-[#F3EFFF]"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
         </Card>
 
         <Card title="♿ Accessibility">
@@ -330,9 +347,57 @@ export function ParentArea({
           <Row label="Colour-blind friendly palette">
             <Switch on={progress.colorblind} onChange={(v) => update({ colorblind: v })} />
           </Row>
-          <Row label="🌙 Dark mode">
-            <Switch on={progress.darkMode} onChange={(v) => update({ darkMode: v })} />
-          </Row>
+        </Card>
+
+        <Card title="🎵 Background music">
+          <div className="flex flex-wrap gap-2">
+            {MUSIC_TRACKS.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => {
+                  update({ musicTrack: t.key });
+                  setMusicTrack(t.key);
+                  sfx.tap();
+                }}
+                className={`rounded-2xl px-4 py-2 text-sm font-black shadow ${progress.musicTrack === t.key ? "bg-[#8E7CFF] text-white" : "bg-[#F3EFFF] text-[#5B4B7A]"}`}
+              >
+                {t.emoji} {t.label}
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <Card title="😴 Sleep timer">
+          <p className="mb-1 text-xs font-bold text-[#7A6C99]">Gently ends play after a set time.</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              [0, "Off"],
+              [10, "10 min"],
+              [20, "20 min"],
+              [30, "30 min"],
+            ].map(([m, label]) => (
+              <button
+                key={m}
+                onClick={() => {
+                  update({ sleepMinutes: m as number });
+                  sfx.tap();
+                }}
+                className={`rounded-2xl px-4 py-2 text-sm font-black shadow ${progress.sleepMinutes === m ? "bg-[#8E7CFF] text-white" : "bg-[#F3EFFF] text-[#5B4B7A]"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <Card title="👶 Kid profiles">
+          <p className="mb-1 text-xs font-bold text-[#7A6C99]">Each child keeps their own stars, art and trophies.</p>
+          <button
+            onClick={onManageProfiles}
+            className="w-full rounded-2xl bg-[#7ED087] py-3 font-black text-white active:scale-95"
+          >
+            Manage kid profiles
+          </button>
         </Card>
 
         <Card title="🌍 Language">
@@ -342,7 +407,7 @@ export function ParentArea({
                 key={l.code}
                 onClick={() => {
                   update({ lang: l.code });
-                  say("Hello!", l.code);
+                  say(phrase("hello", l.code), l.code);
                 }}
                 className={`rounded-2xl px-3 py-2 text-sm font-black ${progress.lang === l.code ? "bg-[#8E7CFF] text-white" : "bg-[#F3EFFF] text-[#5B4B7A]"}`}
               >
@@ -368,6 +433,20 @@ export function ParentArea({
         <Card title="💳 Purchases & Ads">
           <Row label="Ads (kid-safe, non-personalised)"><span className="text-xs font-black text-[#7A6C99]">Disabled in this build</span></Row>
           <Row label="Remove ads / Premium packs"><button className="rounded-xl bg-[#F3EFFF] px-3 py-2 text-xs font-black text-[#5B4B7A]">Restore purchase</button></Row>
+          <Row label="🔓 Family unlock (free for your kids)">
+            <button
+              onClick={() => {
+                update({ premiumUnlocked: true });
+                sfx.reward();
+                fx.confetti(140);
+                fx.shake(10);
+                say("Premium unlocked for the whole family!", progress.lang);
+              }}
+              className={`rounded-xl px-3 py-2 text-xs font-black text-white ${progress.premiumUnlocked ? "bg-[#7ED087]" : "bg-gradient-to-r from-[#FFB03A] to-[#FF7FB6]"}`}
+            >
+              {progress.premiumUnlocked ? "✅ Unlocked" : "Unlock for my family"}
+            </button>
+          </Row>
           <Row label="Backup progress">
             <button
               onClick={() => {
@@ -386,47 +465,26 @@ export function ParentArea({
 
         <Card title="📄 Legal & Support">
           <div className="flex flex-wrap gap-2">
-            <a
-              href="/privacy"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-xl bg-[#F3EFFF] px-3 py-2 text-xs font-black text-[#5B4B7A] hover:bg-[#E8E0F5]"
-            >
-              📄 Privacy Policy
-            </a>
-            <a
-              href="/terms"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-xl bg-[#F3EFFF] px-3 py-2 text-xs font-black text-[#5B4B7A] hover:bg-[#E8E0F5]"
-            >
-              📜 Terms of Service
-            </a>
-            <a
-              href="mailto:support@magiccoloringworld.com"
-              className="rounded-xl bg-[#F3EFFF] px-3 py-2 text-xs font-black text-[#5B4B7A] hover:bg-[#E8E0F5]"
-            >
-              📧 Contact us
-            </a>
-            <button
-              onClick={() => {
-                sfx.star();
-                say("Thank you for rating us!", progress.lang);
-                window.open("https://play.google.com/store/apps", "_blank");
-              }}
-              className="rounded-xl bg-[#FFF2CC] px-3 py-2 text-xs font-black text-[#8A6A1F] hover:bg-[#FFE9A8]"
-            >
-              ⭐ Rate the app
-            </button>
+            <button onClick={() => setDoc("privacy")} className="rounded-xl bg-[#F3EFFF] px-3 py-2 text-xs font-black text-[#5B4B7A]">Privacy Policy</button>
+            <button onClick={() => setDoc("terms")} className="rounded-xl bg-[#F3EFFF] px-3 py-2 text-xs font-black text-[#5B4B7A]">Terms of Service</button>
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="rounded-xl bg-[#EAF7FF] px-3 py-2 text-xs font-black text-[#2A6FE8]">Privacy (web) ↗</a>
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="rounded-xl bg-[#EAF7FF] px-3 py-2 text-xs font-black text-[#2A6FE8]">Terms (web) ↗</a>
+            <a href="mailto:support@magiccoloringworld.example" className="rounded-xl bg-[#F3EFFF] px-3 py-2 text-xs font-black text-[#5B4B7A]">Contact us</a>
+            <button onClick={() => sfx.star()} className="rounded-xl bg-[#FFF2CC] px-3 py-2 text-xs font-black text-[#8A6A1F]">⭐ Rate the app</button>
             <button
               onClick={() => {
                 if (window.confirm("Reset all progress, stars and coins?")) reset();
               }}
-              className="rounded-xl bg-[#FFE9EF] px-3 py-2 text-xs font-black text-[#C23B5E] hover:bg-[#FFD9E4]"
+              className="rounded-xl bg-[#FFE9EF] px-3 py-2 text-xs font-black text-[#C23B5E]"
             >
-              🗑️ Reset progress
+              Reset progress
             </button>
           </div>
+          {doc && (
+            <div className="mt-3 max-h-64 overflow-y-auto rounded-2xl bg-[#FBF7FF] p-3 text-xs leading-relaxed font-medium text-[#5B4B7A]">
+              {doc === "privacy" ? PRIVACY : TERMS}
+            </div>
+          )}
         </Card>
       </div>
     </div>
@@ -531,6 +589,331 @@ export function DailyReward({
         <p className="mt-2 text-sm font-black text-[#7A6C99]">
           {opened ? `You got 🪙 ${10 * day} coins!` : "Tap the chest to open!"}
         </p>
+        <button onClick={onClose} className="mt-3 w-full rounded-2xl bg-[#F3EFFF] py-3 font-black text-[#5B4B7A]">Close</button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================== STORE ================================== */
+
+import { STORE_ITEMS } from "@/lib/premium";
+
+export function Store({
+  onExit,
+  progress,
+  update,
+}: {
+  onExit: () => void;
+  progress: Progress;
+  update: (p: Partial<Progress>) => void;
+}) {
+  const [gate, setGate] = useState(!progress.premiumUnlocked); // gate before buying
+  const [challenge] = useState(() => ({ a: 2 + Math.floor(Math.random() * 8), b: 3 + Math.floor(Math.random() * 7) }));
+  const [answer, setAnswer] = useState("");
+  const [passed, setPassed] = useState(false);
+
+  const buy = (productId: string) => {
+    // NOTE: wire this to Google Play Billing using this exact productId.
+    // For now it grants the unlock so the flow is fully testable.
+    // (Both products unlock content here; pages-only vs all differ once
+    //  Billing is connected — the flag model already supports it.)
+    void productId;
+    update({ premiumUnlocked: true });
+    sfx.reward();
+    fx.confetti(180);
+    fx.shake(12);
+    say("Everything is unlocked! Enjoy!", progress.lang);
+  };
+
+  if (progress.premiumUnlocked) {
+    return (
+      <div className="fixed inset-0 z-40 grid place-items-center bg-[#2E2545]/70 p-4">
+        <div className="w-full max-w-sm rounded-[32px] bg-gradient-to-b from-[#FFF6DC] to-white p-6 text-center shadow-2xl">
+          <div className="text-6xl">👑</div>
+          <h2 className="mt-2 text-2xl font-black text-[#2E2545]">Premium Active!</h2>
+          <p className="mt-1 text-sm font-bold text-[#7A6C99]">All pictures, brushes and stickers are unlocked. Thank you!</p>
+          <button onClick={onExit} className="mt-5 w-full rounded-2xl bg-[#7ED087] py-3 font-black text-white active:scale-95">Back to fun 🎨</button>
+        </div>
+      </div>
+    );
+  }
+
+  // parental gate first (Google Play Families requirement for purchases)
+  if (gate && !passed) {
+    return (
+      <div className="fixed inset-0 z-40 grid place-items-center bg-[#2E2545]/70 p-4">
+        <div className="w-full max-w-sm rounded-[32px] bg-white p-6 text-center shadow-2xl">
+          <div className="text-4xl">🔒</div>
+          <h2 className="text-xl font-black text-[#2E2545]">Grown-ups only</h2>
+          <p className="mt-1 text-sm font-bold text-[#7A6C99]">What is {challenge.a} × {challenge.b}?</p>
+          <input
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value.replace(/\D/g, ""))}
+            inputMode="numeric"
+            className="mt-3 w-full rounded-2xl border-4 border-[#EDE6FF] px-4 py-3 text-center text-2xl font-black text-[#2E2545] outline-none focus:border-[#8E7CFF]"
+            placeholder="?"
+          />
+          <div className="mt-3 flex gap-2">
+            <button onClick={onExit} className="flex-1 rounded-2xl bg-[#F3EFFF] py-3 font-black text-[#5B4B7A]">Back</button>
+            <button
+              onClick={() => {
+                if (Number(answer) === challenge.a * challenge.b) {
+                  setPassed(true);
+                  setGate(false);
+                  sfx.tap();
+                } else {
+                  sfx.wrong();
+                  fx.shake(12);
+                  setAnswer("");
+                }
+              }}
+              className="flex-1 rounded-2xl bg-[#8E7CFF] py-3 font-black text-white"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 overflow-y-auto bg-[radial-gradient(circle_at_50%_0%,#FFF3D9,transparent_60%)] bg-[#FFFBF2] p-3">
+      <div className="mx-auto max-w-lg space-y-3 pb-10">
+        <div className="flex items-center gap-2">
+          <button onClick={onExit} className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-2xl shadow-md" aria-label="Back">🏠</button>
+          <h2 className="rounded-full bg-white px-4 py-1.5 font-black text-[#5B4B7A] shadow">👑 Premium Store</h2>
+        </div>
+
+        <div className="rounded-3xl bg-white p-5 text-center shadow-lg">
+          <div className="text-6xl">👑</div>
+          <h3 className="mt-2 text-xl font-black text-[#2E2545]">Unlock Everything</h3>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-left text-sm font-bold text-[#5B4B7A]">
+            <div className="rounded-2xl bg-[#FFF6DC] p-3">🎨 All 120+ pictures</div>
+            <div className="rounded-2xl bg-[#EAF7FF] p-3">🏞️ All big scenes</div>
+            <div className="rounded-2xl bg-[#F3FFE3] p-3">🖌️ All magic brushes</div>
+            <div className="rounded-2xl bg-[#FFF0F6] p-3">🌟 All sticker packs</div>
+          </div>
+          <div className="mt-4 space-y-2">
+            {STORE_ITEMS.map((it) => {
+              const isMain = it.kind === "unlock_all";
+              return (
+                <button
+                  key={it.id}
+                  onClick={() => buy(it.id)}
+                  className={`w-full rounded-3xl py-4 font-black text-white shadow-lg active:scale-95 ${
+                    isMain
+                      ? "bg-gradient-to-r from-[#FFB03A] to-[#FF7FB6] text-xl"
+                      : "bg-gradient-to-r from-[#8E7CFF] to-[#5AC8FA] text-base"
+                  }`}
+                >
+                  {isMain && <span className="mr-1">👑 Best value ·</span>}
+                  {it.emoji} {it.title} — {it.price}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => {
+              // restore purchase placeholder (Google Play restores automatically)
+              say("Checking your purchases…", progress.lang);
+              sfx.tap();
+            }}
+            className="mt-2 w-full rounded-2xl bg-[#F3EFFF] py-3 text-sm font-black text-[#5B4B7A]"
+          >
+            Restore purchase
+          </button>
+          <p className="mt-3 text-[11px] font-bold text-[#A99CC4]">
+            One-time payment · No ads · No subscription · Family safe
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ ACHIEVEMENTS ============================== */
+
+export function Achievements({ onExit, progress }: { onExit: () => void; progress: Progress }) {
+  const unlocked = progress.achievements;
+  const got = ACHIEVEMENTS.filter((a) => unlocked.includes(a.id)).length;
+  return (
+    <div className="fixed inset-0 z-40 flex flex-col bg-[radial-gradient(circle_at_50%_0%,#FFF3D9,transparent_60%)] bg-[#FFFBF2]">
+      <div className="flex items-center gap-2 p-2 sm:p-3">
+        <button onClick={onExit} className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-2xl shadow-md active:scale-90" aria-label="Home">🏠</button>
+        <div className="rounded-full bg-white px-4 py-1.5 font-black text-[#5B4B7A] shadow">
+          🏆 Trophies <span className="text-xs text-[#B7A9D4]">{got}/{ACHIEVEMENTS.length}</span>
+        </div>
+      </div>
+      <div className="grid flex-1 grid-cols-2 content-start gap-3 overflow-y-auto p-3 sm:grid-cols-3 md:grid-cols-4">
+        {ACHIEVEMENTS.map((a) => {
+          const on = unlocked.includes(a.id);
+          return (
+            <div
+              key={a.id}
+              className={`rounded-3xl p-4 text-center shadow-lg transition ${on ? "bg-gradient-to-b from-[#FFF6DC] to-white ring-4 ring-[#FFD84D]" : "bg-white/70"}`}
+            >
+              <div className={`text-5xl ${on ? "" : "opacity-25 grayscale"}`}>{on ? a.emoji : "🔒"}</div>
+              <div className="mt-1 text-sm font-black text-[#5B4B7A]">{a.title}</div>
+              <div className="text-[11px] font-bold text-[#A99CC4]">{a.desc}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* popup shown when a trophy is unlocked */
+export function TrophyPopup({ emoji, title, onClose }: { emoji: string; title: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[75] grid place-items-center bg-[#2E2545]/60 p-4" onPointerDown={onClose}>
+      <div className="w-full max-w-xs rounded-[32px] bg-gradient-to-b from-[#FFF6DC] to-white p-6 text-center shadow-2xl pop-in">
+        <p className="text-xs font-black uppercase tracking-widest text-[#FFB03A]">Trophy unlocked!</p>
+        <div className="my-2 text-7xl">{emoji}</div>
+        <h2 className="text-xl font-black text-[#2E2545]">{title}</h2>
+        <button onClick={onClose} className="mt-4 w-full rounded-2xl bg-[#FFB03A] py-3 font-black text-white active:scale-95">Yay! 🎉</button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ PROFILE PICKER =========================== */
+
+export function ProfilePicker({
+  profiles,
+  activeId,
+  onSwitch,
+  onAdd,
+  onDelete,
+  onRestore,
+  onClose,
+}: {
+  profiles: Profile[];
+  activeId: string;
+  onSwitch: (id: string) => void;
+  onAdd: (name: string, avatar: string) => void;
+  onDelete: (id: string) => void;
+  onRestore: (data: Progress) => void;
+  onClose: () => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [avatar, setAvatar] = useState(AVATARS[0]);
+  const [restoreCode, setRestoreCode] = useState("");
+  const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
+
+  return (
+    <div className="fixed inset-0 z-[65] grid place-items-center bg-[#2E2545]/70 p-4">
+      <div className="w-full max-w-md rounded-[32px] bg-white p-5 shadow-2xl">
+        <h2 className="text-center text-xl font-black text-[#2E2545]">👶 Who is playing?</h2>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {profiles.map((p) => (
+            <div key={p.id} className="relative">
+              <button
+                onClick={() => {
+                  onSwitch(p.id);
+                  sfx.star();
+                  onClose();
+                }}
+                className={`w-full rounded-3xl p-3 text-center shadow transition active:scale-95 ${p.id === activeId ? "bg-[#8E7CFF] text-white ring-4 ring-[#FFD84D]" : "bg-[#F3EFFF] text-[#5B4B7A]"}`}
+              >
+                <div className="text-4xl">{p.data.avatar}</div>
+                <div className="mt-1 truncate text-xs font-black">{p.data.name}</div>
+                <div className="text-[10px]">⭐{p.data.stars}</div>
+                {p.data.syncCode && (
+                  <div className="mt-0.5 rounded-full bg-white/70 px-1 text-[9px] font-black tracking-widest text-[#8E7CFF]">🔑 {p.data.syncCode}</div>
+                )}
+              </button>
+              {profiles.length > 1 && (
+                <button
+                  onClick={() => onDelete(p.id)}
+                  className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full bg-[#FFE9EF] text-xs shadow"
+                  aria-label="Delete profile"
+                >
+                  ✖️
+                </button>
+              )}
+            </div>
+          ))}
+          {profiles.length < 4 && !adding && (
+            <button onClick={() => setAdding(true)} className="rounded-3xl bg-[#F3FFE3] p-3 text-center shadow active:scale-95">
+              <div className="text-4xl">➕</div>
+              <div className="mt-1 text-xs font-black text-[#5B4B7A]">Add kid</div>
+            </button>
+          )}
+        </div>
+
+        {adding && (
+          <div className="mt-4 rounded-2xl bg-[#FBF7FF] p-3">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value.slice(0, 14))}
+              placeholder="Name"
+              className="w-full rounded-xl border-2 border-[#EDE6FF] px-3 py-2 text-center font-black text-[#2E2545] outline-none"
+            />
+            <div className="mt-2 grid grid-cols-6 gap-1">
+              {AVATARS.map((a) => (
+                <button
+                  key={a}
+                  onClick={() => setAvatar(a)}
+                  className={`grid h-10 place-items-center rounded-xl text-2xl ${avatar === a ? "bg-[#8E7CFF] ring-2 ring-[#FFD84D]" : "bg-white"}`}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                onAdd(name, avatar);
+                setAdding(false);
+                setName("");
+                sfx.reward();
+              }}
+              className="mt-2 w-full rounded-2xl bg-[#7ED087] py-3 font-black text-white active:scale-95"
+            >
+              Create ✨
+            </button>
+          </div>
+        )}
+
+        <div className="mt-4 rounded-2xl bg-[#EAF7FF] p-3">
+          <p className="text-xs font-black text-[#2A6FE8]">📥 Restore on this device (from another phone/tablet)</p>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={restoreCode}
+              onChange={(e) => setRestoreCode(e.target.value.toUpperCase().slice(0, 6))}
+              placeholder="🔑 CODE"
+              className="w-full rounded-xl border-2 border-white bg-white px-3 py-2 text-center font-black tracking-widest text-[#2E2545] outline-none"
+            />
+            <button
+              onClick={async () => {
+                if (restoreCode.length < 6) return;
+                try {
+                  const res = await fetch(`/api/progress?code=${restoreCode}`);
+                  if (!res.ok) {
+                    setRestoreMsg("❌ Code not found");
+                    sfx.wrong();
+                    return;
+                  }
+                  const d = (await res.json()) as { data: Progress };
+                  onRestore(d.data);
+                  setRestoreMsg(`✅ Welcome back, ${d.data.name}!`);
+                  sfx.reward();
+                  window.setTimeout(onClose, 1200);
+                } catch {
+                  setRestoreMsg("⚠️ No internet");
+                }
+              }}
+              className="shrink-0 rounded-xl bg-[#2A6FE8] px-4 py-2 font-black text-white active:scale-95"
+            >
+              Restore
+            </button>
+          </div>
+          {restoreMsg && <p className="mt-1 text-xs font-black text-[#2A6FE8]">{restoreMsg}</p>}
+        </div>
+
         <button onClick={onClose} className="mt-3 w-full rounded-2xl bg-[#F3EFFF] py-3 font-black text-[#5B4B7A]">Close</button>
       </div>
     </div>
