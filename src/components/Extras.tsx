@@ -768,6 +768,7 @@ export function DailyReward({
 /* ============================== STORE ================================== */
 
 import { FAMILY_UNLOCK_CODE, STORE_ITEMS } from "@/lib/premium";
+import { purchase } from "@/lib/billing";
 
 export function Store({
   onExit,
@@ -783,12 +784,15 @@ export function Store({
   const [answer, setAnswer] = useState("");
   const [passed, setPassed] = useState(false);
 
-  const buy = (productId: string) => {
-    // NOTE: wire this to Google Play Billing using this exact productId.
-    // For now it grants the unlock so the flow is fully testable.
-    // (Both products unlock content here; pages-only vs all differ once
-    //  Billing is connected — the flag model already supports it.)
-    void productId;
+  const buy = async (productId: string) => {
+    // Real Google Play Billing when running inside a TWA with billing enabled;
+    // free simulation otherwise (web/dev), behind the parental gate.
+    const res = await purchase(productId);
+    if (!res.ok) {
+      sfx.wrong();
+      say("Something went wrong, please try again.", progress.lang);
+      return;
+    }
     update({ premiumUnlocked: true });
     sfx.reward();
     fx.confetti(180);
