@@ -1,676 +1,235 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Studio, { PagePreview } from "@/components/Studio";
-import BalloonPop from "@/components/BalloonPop";
-import DotsGame from "@/components/DotsGame";
-import { Achievements, DailyReward, Gallery, LearnMode, ParentArea, ProfilePicker, Store, TRACE_SETS, TrophyPopup } from "@/components/Extras";
-import ShadowGame from "@/components/ShadowGame";
-import AvatarDesigner from "@/components/AvatarDesigner";
-import { CATEGORIES } from "@/lib/art/catalog";
-import type { PageArt } from "@/lib/art/shapes";
-import { phrase, setAudioSetting, setMusicTrack, setVoiceCharacter, sfx, say, saySlow, startMusic, stopMusic, unlockAudio, type VoiceId } from "@/lib/audio";
-import { useProgress } from "@/lib/progress";
-import { fx } from "@/components/FxLayer";
-import Buddy, { buddySpeak } from "@/components/Buddy";
-import { timeGreeting } from "@/lib/buddy";
-import { ACHIEVEMENTS, newlyUnlocked } from "@/lib/achievements";
+import Link from "next/link";
+import { useMemo } from "react";
+import { buildCatalog, CATEGORIES } from "@/lib/art/catalog";
+import { PagePreview } from "@/components/Studio";
 
-type View =
-  | "home"
-  | "categories"
-  | "pages"
-  | "studio"
-  | "draw"
-  | "tracepick"
-  | "balloon"
-  | "dots"
-  | "shadow"
-  | "learn"
-  | "gallery"
-  | "trophies"
-  | "store"
-  | "buddy"
-  | "parent";
+const SHOT_SLUGS = [
+  "scene-flower-garden",
+  "animals-bear",
+  "space-rocket",
+  "princesses-rose",
+  "sea-octopus",
+  "food-cupcake",
+  "scene-house-by-sea",
+  "dinosaurs-t-rex",
+];
 
-interface PageRow {
-  id: number;
-  slug: string;
-  title: string;
-  category: string;
-  difficulty: number;
-  premium: boolean;
-  data: { emoji: string; viewBox: string; shapes: PageArt["shapes"] };
-}
+const FEATURES = [
+  ["🎨", "122+ Original Pages", "Animals, dinosaurs, cars, princesses, space, sea, farm, birds, flowers, food & big scenes."],
+  ["🖌️", "15 Magic Brushes", "Crayon, watercolor, glitter, rainbow, neon, airbrush, patterns and more."],
+  ["🔢", "Color by Numbers", "Kids tap the matching number — learning numbers while they color."],
+  ["🧸", "A Talking Buddy", "A friendly companion greets your child by name in 9 languages."],
+  ["🤝", "Color Together", "Up to 6 kids color the same picture live from different devices."],
+  ["🎈", "6 Learning Games", "Balloon Pop, Dot-to-Dot, Shadow Match, Trace, Learn & Say and more."],
+  ["🎭", "Design Your Buddy", "Kids create their own companion — animal, boy or girl."],
+  ["📖", "PDF Art Book", "Export a printable book of your child's masterpieces."],
+  ["☁️", "Cloud Save", "Each child has a secret code — progress follows them to any device."],
+  ["👨‍👩‍👧", "Parent Dashboard", "Parental gate, premium control, sleep timer, progress reset."],
+  ["📴", "Works Offline", "Full gameplay with no internet — perfect for travel."],
+  ["🔒", "100% Kid-Safe", "No ads, no chat, no data collection. COPPA & Families ready."],
+] as const;
 
-export default function Home() {
-  const { progress, update, reset, ready, profiles, activeId, addProfile, switchProfile, deleteProfile, importProfile, updateProfile } = useProgress();
-  const [view, setView] = useState<View>("home");
-  const [started, setStarted] = useState(false);
-  const [category, setCategory] = useState<string>("scenes");
-  const [pages, setPages] = useState<Record<string, PageArt[]>>({});
-  const [loading, setLoading] = useState(false);
-  const [art, setArt] = useState<PageArt | null>(null);
-  const [traceGlyph, setTraceGlyph] = useState<string | undefined>();
-  const [drawMode, setDrawMode] = useState<"blank" | "grid" | "mirror">("blank");
-  const [totals, setTotals] = useState<{ total: number }>({ total: 0 });
-  const [gift, setGift] = useState(false);
-  const [traceSet, setTraceSet] = useState(0);
-  const [showProfiles, setShowProfiles] = useState(false);
-  const [trophy, setTrophy] = useState<{ emoji: string; title: string } | null>(null);
-  const [sleeping, setSleeping] = useState(false);
-  const [chest, setChest] = useState(false);
-  const chestSeen = useMemo(() => Math.floor(progress.completed.length / 5), [progress.completed.length]);
+const FAQ = [
+  ["Is Magic Coloring World free?", "Yes! Dozens of pages and all core games are free forever. An optional one-time Premium unlock adds every page, scene and magic brush."],
+  ["What ages is it for?", "Designed for children 3–8, with simple one-tap controls, voice guidance and large touch targets."],
+  ["Is it safe for my child?", "Absolutely. There are no ads, no chat, no external links for kids, and all settings live behind a parental gate. We never collect personal data."],
+  ["Does it work without internet?", "Yes — after the first load the whole game works offline. Progress syncs when you're back online."],
+  ["How do I move my child's progress to a new device?", "Every child has a 6-letter code in the Parent Area. Type it on the new device under “Who is playing? → Restore” and everything comes back."],
+  ["Where can I get it on Android?", "The web version is fully playable right now. The Google Play release is on its way — press “Play now” to try it instantly in your browser."],
+] as const;
 
-  useEffect(() => {
-    setAudioSetting("sound", progress.sound);
-    setAudioSetting("music", progress.music);
-    setAudioSetting("voice", progress.voice);
-    setVoiceCharacter((progress.voiceChar || "teacher_f") as VoiceId);
-    setMusicTrack(progress.musicTrack || "lullaby");
-  }, [progress.sound, progress.music, progress.voice, progress.voiceChar, progress.musicTrack]);
-
-  // watch for newly unlocked achievements
-  useEffect(() => {
-    if (!ready) return;
-    const fresh = newlyUnlocked(progress);
-    if (fresh.length) {
-      const a = fresh[0];
-      update({ achievements: [...progress.achievements, ...fresh.map((f) => f.id)] });
-      window.setTimeout(() => {
-        setTrophy({ emoji: a.emoji, title: a.title });
-        sfx.reward();
-        fx.confetti(90);
-      }, 700);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progress.completed.length, progress.stars, progress.coins, progress.streak, progress.bestBalloon, progress.bestDots, progress.bestShadow, ready]);
-
-  // treasure chest every 5 finished pictures
-  useEffect(() => {
-    if (!ready) return;
-    if (chestSeen > progress.chestProgress) {
-      window.setTimeout(() => setChest(true), 900);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chestSeen, ready]);
-
-  // sleep timer (parent-controlled): gently ends the session
-  useEffect(() => {
-    if (!started || !progress.sleepMinutes) return;
-    const t = window.setTimeout(() => {
-      stopMusic();
-      setSleeping(true);
-      if (progress.buddyOn) buddySpeak("goodbye");
-    }, progress.sleepMinutes * 60000);
-    return () => window.clearTimeout(t);
-  }, [started, progress.sleepMinutes, progress.buddyOn]);
-
-  useEffect(() => {
-    fetch("/api/pages")
-      .then((r) => r.json())
-      .then((d: { total: number }) => setTotals({ total: d.total ?? 0 }))
-      .catch(() => undefined);
-  }, []);
-
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-
-  const begin = () => {
-    unlockAudio();
-    startMusic();
-    setStarted(true);
-    sfx.star();
-    fx.confetti(60);
-    // buddy greets the child by name — returning visitor vs. first-timer vs. time of day
-    window.setTimeout(() => {
-      if (!progress.buddyOn) {
-        say(phrase("welcome", progress.lang), progress.lang);
-        return;
-      }
-      const returning = progress.completed.length > 0 || progress.streak > 0;
-      buddySpeak(returning ? "welcomeBack" : "welcome");
-      window.setTimeout(() => buddySpeak(timeGreeting()), 4200);
-    }, 500);
-    if (progress.lastReward !== today) window.setTimeout(() => setGift(true), 1400);
-  };
-
-  useEffect(() => () => stopMusic(), []);
-
-  // never let the profile picker stay open across screens (prevents stuck dim overlay)
-  useEffect(() => {
-    setShowProfiles(false);
-  }, [view]);
-
-  const loadCategory = useCallback(
-    async (key: string) => {
-      setCategory(key);
-      setView("pages");
-      sfx.whoosh();
-      if (pages[key]) return;
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/pages?category=${key}`);
-        const data = (await res.json()) as { pages: PageRow[] };
-        const arts: PageArt[] = (data.pages ?? []).map((p) => ({
-          slug: p.slug,
-          title: p.title,
-          category: p.category,
-          difficulty: p.difficulty,
-          emoji: p.data.emoji,
-          viewBox: p.data.viewBox,
-          shapes: p.data.shapes,
-          premium: p.premium,
-        }));
-        setPages((prev) => ({ ...prev, [key]: arts }));
-      } catch {
-        setPages((prev) => ({ ...prev, [key]: [] }));
-      }
-      setLoading(false);
-    },
-    [pages],
-  );
-
-  const big = progress.bigUi;
-
-  if (!ready) return <div className="grid min-h-screen place-items-center text-4xl">🎨</div>;
-
-  if (!started) {
-    return (
-      <main className="relative grid min-h-[100dvh] place-items-center overflow-hidden bg-[linear-gradient(160deg,#FFE8F4,#E7F3FF_45%,#FFF6DE)] p-6 text-center">
-        <Bubbles />
-        <div className="relative z-10">
-          <div className="animate-[floaty_3s_ease-in-out_infinite] text-[86px] leading-none drop-shadow-lg">🎨</div>
-          <h1 className="mt-2 bg-gradient-to-r from-[#FF5C7A] via-[#8E7CFF] to-[#38C6D9] bg-clip-text text-4xl font-black text-transparent sm:text-6xl">
-            Magic Coloring World
-          </h1>
-          <p className="mt-2 text-base font-black text-[#7A6C99]">
-            {totals.total || 110}+ coloring pages · games · stickers · learning
-          </p>
-          <button
-            onClick={begin}
-            className="mt-7 rounded-full bg-gradient-to-r from-[#FF7FB6] to-[#FFB03A] px-12 py-5 text-2xl font-black text-white shadow-[0_14px_30px_rgba(255,127,182,.5)] transition active:scale-95"
-          >
-            ▶️ Play
-          </button>
-          <p className="mt-4 text-xs font-bold text-[#A99CC4]">Best played with sound on 🔊</p>
-        </div>
-      </main>
-    );
-  }
-
-  const buddyEl = (
-    <Buddy
-      name={progress.name}
-      lang={progress.lang}
-      face={progress.buddyFace}
-      enabled={progress.buddyOn}
-      voice={progress.voice}
-      custom={progress.buddyCustom}
-      pos={progress.buddyPos}
-      onPos={(np) => update({ buddyPos: np })}
-    />
-  );
-
-  if (view === "studio" || view === "draw")
-    return (
-      <>
-        <Studio
-          key={activeId}
-          art={view === "studio" ? art : null}
-          traceGlyph={view === "draw" ? traceGlyph : undefined}
-          drawMode={drawMode}
-          progress={progress}
-          update={update}
-          onNeedPremium={() => setView("store")}
-          onCoopJoin={(p) => setArt(p)}
-          onExit={() => {
-            setTraceGlyph(undefined);
-            setView(view === "studio" ? "pages" : "home");
-          }}
-        />
-        {buddyEl}
-      </>
-    );
-  if (view === "balloon") return <BalloonPop key={activeId} onExit={() => setView("home")} progress={progress} update={update} />;
-  if (view === "dots")
-    return (
-      <>
-        <DotsGame key={activeId} onExit={() => setView("home")} progress={progress} update={update} />
-        {buddyEl}
-      </>
-    );
-  if (view === "learn")
-    return (
-      <>
-        <LearnMode key={activeId} onExit={() => setView("home")} lang={progress.lang} />
-        {buddyEl}
-      </>
-    );
-  if (view === "gallery")
-    return (
-      <>
-        <Gallery key={activeId} onExit={() => setView("home")} progress={progress} />
-        {buddyEl}
-      </>
-    );
-  if (view === "shadow")
-    return (
-      <>
-        <ShadowGame key={activeId} onExit={() => setView("home")} progress={progress} update={update} />
-        {buddyEl}
-      </>
-    );
-  if (view === "trophies")
-    return (
-      <>
-        <Achievements key={activeId} onExit={() => setView("home")} progress={progress} />
-        {buddyEl}
-      </>
-    );
-  if (view === "buddy")
-    return (
-      <>
-        <AvatarDesigner key={activeId} onExit={() => setView("home")} progress={progress} update={update} />
-        {buddyEl}
-      </>
-    );
-  if (view === "store")
-    return <Store key={activeId} onExit={() => setView("home")} progress={progress} update={update} />;
-  if (view === "parent")
-    return (
-      <ParentArea
-        onExit={() => setView("home")}
-        progress={progress}
-        update={update}
-        reset={reset}
-        onManageProfiles={() => setShowProfiles(true)}
-        profiles={profiles}
-        onUpdateProfile={updateProfile}
-        onDeleteProfile={deleteProfile}
-      />
-    );
+export default function LandingPage() {
+  const catalog = useMemo(() => buildCatalog(), []);
+  const shots = useMemo(() => {
+    const picked = SHOT_SLUGS.map((s) => catalog.find((p) => p.slug === s)).filter(Boolean);
+    return (picked.length ? picked : catalog.slice(0, 8)) as typeof catalog;
+  }, [catalog]);
+  const counts = useMemo(() => {
+    const m: Record<string, number> = {};
+    catalog.forEach((p) => (m[p.category] = (m[p.category] ?? 0) + 1));
+    return m;
+  }, [catalog]);
 
   return (
-    <main key={activeId} className="relative min-h-[100dvh] overflow-x-hidden bg-[linear-gradient(160deg,#FFF0F8,#EAF5FF_50%,#FFF8E6)] pb-8">
-      <Bubbles />
-      {gift && <DailyReward progress={progress} update={update} onClose={() => setGift(false)} />}
-
-      {/* HUD */}
-      <header className="relative z-10 flex items-center gap-2 overflow-x-auto p-3">
-        <button
-          onClick={() => {
-            setShowProfiles(true);
-            sfx.tap();
-          }}
-          className="flex shrink-0 items-center gap-1 rounded-full bg-white/85 px-2 py-1 font-black text-[#5B4B7A] shadow active:scale-95"
-          aria-label="Switch kid"
-        >
-          <span className="text-xl">{progress.avatar}</span>
-          <span className="max-w-[64px] truncate text-sm">{progress.name}</span>
-        </button>
-        <div className="flex shrink-0 items-center gap-1 rounded-full bg-white/85 px-3 py-1.5 font-black text-[#5B4B7A] shadow">
-          ⭐ {progress.stars}
-        </div>
-        <div className="flex shrink-0 items-center gap-1 rounded-full bg-white/85 px-3 py-1.5 font-black text-[#5B4B7A] shadow">
-          🪙 {progress.coins}
-        </div>
-        <div className="ml-auto flex shrink-0 gap-2">
-          {!progress.premiumUnlocked && (
-            <button
-              onClick={() => {
-                setView("store");
-                sfx.tap();
-              }}
-              className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-b from-[#FFE9A8] to-[#FFB03A] text-2xl shadow ring-2 ring-[#FFD84D] active:scale-90"
-              aria-label="Premium store"
-            >
-              👑
-            </button>
-          )}
-          <button
-            onClick={() => {
-              setView("trophies");
-              sfx.tap();
-            }}
-            className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-2xl shadow active:scale-90"
-            aria-label="Trophies"
-          >
-            🏆
-          </button>
-          <button
-            onClick={() => {
-              setGift(true);
-              sfx.tap();
-            }}
-            className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-2xl shadow active:scale-90"
-            aria-label="Daily gift"
-          >
-            🎁
-          </button>
-          <button
-            onClick={() => {
-              update({ music: !progress.music });
-              if (progress.music) stopMusic();
-              else startMusic();
-            }}
-            className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-2xl shadow active:scale-90"
-            aria-label="Music"
-          >
-            {progress.music ? "🎵" : "🔇"}
-          </button>
-          <button
-            onClick={() => setView("parent")}
-            className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-2xl shadow active:scale-90"
-            aria-label="Parent area"
-          >
-            👨‍👩‍👧
-          </button>
+    <main className="min-h-[100dvh] bg-[#FFF8FC] text-[#2D3748]">
+      {/* header */}
+      <header className="sticky top-0 z-40 border-b border-[#FFE1EF] bg-white/85 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-[#FF6B9D] to-[#FFB03A] text-2xl shadow">🎨</span>
+            <span className="text-lg font-black text-[#FF4D94]">Magic Coloring World</span>
+          </Link>
+          <nav className="ml-auto hidden items-center gap-5 text-sm font-black text-[#6B5B8A] md:flex">
+            <a href="#features">Features</a>
+            <a href="#categories">Categories</a>
+            <a href="#parents">For Parents</a>
+            <a href="#faq">FAQ</a>
+          </nav>
+          <Link href="/play" className="rounded-full bg-gradient-to-r from-[#FF6B9D] to-[#FFB03A] px-5 py-2 text-sm font-black text-white shadow active:scale-95">
+            ▶ Play
+          </Link>
         </div>
       </header>
 
-      {view === "home" && (
-        <div className="relative z-10 mx-auto max-w-4xl px-3">
-          <h1 className="text-center text-3xl font-black text-[#4B3B6E] drop-shadow-sm sm:text-4xl">
-            Hi {progress.name}! What shall we play? 🌈
-          </h1>
-          <div className={`mt-4 grid gap-3 ${big ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
-            <Tile emoji="🎨" label="Coloring" tone="#FF7FB6" onClick={() => { setView("categories"); buddySpeak("pickColor"); }} big />
-            <Tile
-              emoji="✏️"
-              label="Free Draw"
-              tone="#5AC8FA"
-              onClick={() => {
-                setDrawMode("blank");
-                setTraceGlyph(undefined);
-                setView("draw");
-              }}
-              big
-            />
-            <Tile emoji="✍️" label="Trace" tone="#8E7CFF" onClick={() => setView("tracepick")} />
-            <Tile emoji="🎈" label="Balloon Pop" tone="#FF5C7A" onClick={() => setView("balloon")} />
-            <Tile emoji="🔢" label="Dot to Dot" tone="#FFB03A" onClick={() => setView("dots")} />
-            <Tile emoji="🌑" label="Shadow Match" tone="#6C7BD6" onClick={() => setView("shadow")} />
-            <Tile emoji="🏆" label="Trophies" tone="#FFD84D" onClick={() => setView("trophies")} />
-            <Tile emoji="🎭" label="My Buddy" tone="#FF9FC4" onClick={() => setView("buddy")} />
-            <Tile emoji="🎓" label="Learn" tone="#7ED087" onClick={() => setView("learn")} />
-            <Tile emoji="🖼️" label="My Gallery" tone="#38C6D9" onClick={() => setView("gallery")} />
-            <Tile
-              emoji="🪞"
-              label="Mirror Draw"
-              tone="#B49BE0"
-              onClick={() => {
-                setDrawMode("mirror");
-                setTraceGlyph(undefined);
-                setView("draw");
-              }}
-            />
-            <Tile
-              emoji="▦"
-              label="Grid Draw"
-              tone="#FFC94D"
-              onClick={() => {
-                setDrawMode("grid");
-                setTraceGlyph(undefined);
-                setView("draw");
-              }}
-            />
-          </div>
-          <p className="mt-5 text-center text-xs font-bold text-[#A99CC4]">
-            {progress.completed.length} pages finished · Balloon best {progress.bestBalloon} · Dots reached #{progress.bestDots}
-          </p>
-        </div>
-      )}
-
-      {view === "categories" && (
-        <div className="relative z-10 mx-auto max-w-4xl px-3">
-          <TopBar title="🎨 Pick a picture book" onBack={() => setView("home")} />
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-            {CATEGORIES.map((c) => (
-              <button
-                key={c.key}
-                onClick={() => void loadCategory(c.key)}
-                className="rounded-[28px] bg-white p-4 shadow-lg transition hover:-translate-y-1 active:scale-95"
-                style={{ boxShadow: `0 10px 24px ${c.color}44` }}
-              >
-                <div className="text-5xl">{c.emoji}</div>
-                <div className="mt-1 text-sm font-black text-[#5B4B7A]">{c.label}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {view === "pages" && (
-        <div className="relative z-10 mx-auto max-w-5xl px-3">
-          <TopBar
-            title={`${CATEGORIES.find((c) => c.key === category)?.emoji ?? "🎨"} ${CATEGORIES.find((c) => c.key === category)?.label ?? ""}`}
-            onBack={() => setView("categories")}
-          />
-          {loading && <p className="mt-6 text-center font-black text-[#B7A9D4]">Loading pictures…</p>}
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {(pages[category] ?? []).map((p) => {
-              const locked = !!p.premium && !progress.premiumUnlocked;
-              return (
-                <button
-                  key={p.slug}
-                  onClick={() => {
-                    if (locked) {
-                      setView("store");
-                      sfx.tap();
-                      return;
-                    }
-                    setArt(p);
-                    setView("studio");
-                    sfx.tap();
-                    saySlow(p.title, progress.lang);
-                    window.setTimeout(() => buddySpeak("encourage"), 1600);
-                  }}
-                  className="relative overflow-hidden rounded-[26px] bg-white p-2 shadow-lg transition hover:-translate-y-1 active:scale-95"
-                >
-                  <div className={locked ? "opacity-60" : ""}>
-                    <PagePreview
-                      art={p}
-                      className={category === "scenes" ? "aspect-[4/3] w-full rounded-2xl bg-white" : "aspect-square w-full"}
-                    />
-                  </div>
-                  <div className="mt-1 flex items-center justify-between gap-1">
-                    <span className="truncate text-xs font-black text-[#5B4B7A]">{p.title}</span>
-                    <span className="shrink-0 text-[10px]">{"⭐".repeat(p.difficulty)}</span>
-                  </div>
-                  {locked && (
-                    <span className="absolute inset-0 grid place-items-center">
-                      <span className="grid h-12 w-12 place-items-center rounded-full bg-[#FFD84D] text-2xl shadow-lg ring-4 ring-white">
-                        🔒
-                      </span>
-                    </span>
-                  )}
-                  {locked && (
-                    <span className="absolute top-2 right-2 rounded-full bg-[#FFB03A] px-2 py-0.5 text-[9px] font-black text-white shadow">
-                      👑 PRO
-                    </span>
-                  )}
-                  {!locked && progress.completed.includes(p.slug) && (
-                    <span className="absolute top-2 right-2 text-xl drop-shadow">✅</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {view === "tracepick" && (
-        <div className="relative z-10 mx-auto max-w-4xl px-3">
-          <TopBar title="✍️ Trace &amp; Write" onBack={() => setView("home")} />
-          <div className="mt-3 flex flex-wrap gap-2">
-            {TRACE_SETS.map((s, i) => (
-              <button
-                key={s.key}
-                onClick={() => {
-                  setTraceSet(i);
-                  sfx.tap();
-                }}
-                className={`rounded-2xl px-4 py-2 text-sm font-black shadow ${i === traceSet ? "bg-[#8E7CFF] text-white" : "bg-white text-[#5B4B7A]"}`}
-              >
-                {s.emoji} {s.label}
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
-            {TRACE_SETS[traceSet].items.map((g) => (
-              <button
-                key={g}
-                onClick={() => {
-                  setTraceGlyph(g);
-                  setDrawMode("blank");
-                  setView("draw");
-                  say(g.length > 1 ? g : `Trace ${g}`, progress.lang);
-                }}
-                className="grid aspect-square place-items-center rounded-3xl bg-white text-3xl font-black text-[#5B4B7A] shadow-lg active:scale-90"
-              >
-                {g}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {showProfiles && (
-        <ProfilePicker
-          profiles={profiles}
-          activeId={activeId}
-          onSwitch={(id) => {
-            switchProfile(id);
-            setShowProfiles(false);
-          }}
-          onAdd={addProfile}
-          onDelete={deleteProfile}
-          onRestore={importProfile}
-          onClose={() => setShowProfiles(false)}
-        />
-      )}
-
-      {trophy && <TrophyPopup emoji={trophy.emoji} title={trophy.title} onClose={() => setTrophy(null)} />}
-
-      {chest && (
-        <div className="fixed inset-0 z-[68] grid place-items-center bg-[#2E2545]/70 p-4">
-          <div className="w-full max-w-xs rounded-[32px] bg-gradient-to-b from-[#FFF6DC] to-white p-6 text-center shadow-2xl pop-in">
-            <p className="text-xs font-black uppercase tracking-widest text-[#FFB03A]">Treasure chest!</p>
-            <button
-              onClick={() => {
-                const coins = 25;
-                const stars = 3;
-                update({ coins: progress.coins + coins, stars: progress.stars + stars, chestProgress: chestSeen });
-                sfx.reward();
-                fx.confetti(160);
-                fx.shake(10);
-                if (progress.buddyOn) buddySpeak("praise");
-                setChest(false);
-              }}
-              className="my-2 text-8xl transition active:scale-90"
-              aria-label="Open chest"
-            >
-              🧰
-            </button>
-            <p className="text-sm font-black text-[#7A6C99]">Tap to open your reward!</p>
-            <p className="mt-1 text-xs font-bold text-[#A99CC4]">🪙 25 coins · ⭐ 3 stars</p>
-          </div>
-        </div>
-      )}
-
-      {sleeping && (
-        <div className="fixed inset-0 z-[90] grid place-items-center bg-[#1A1330]/90 p-6 text-center backdrop-blur-md">
+      {/* hero */}
+      <section className="relative overflow-hidden">
+        <div className="pointer-events-none absolute -top-20 -left-20 h-72 w-72 rounded-full bg-[#FFD1E6]/60 blur-3xl" />
+        <div className="pointer-events-none absolute -top-10 right-0 h-72 w-72 rounded-full bg-[#CFEFFF]/70 blur-3xl" />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 md:grid-cols-2">
           <div>
-            <div className="text-7xl">🌙</div>
-            <h2 className="mt-3 text-2xl font-black text-white">Time to rest, {progress.name}!</h2>
-            <p className="mt-1 text-sm font-bold text-[#C7BEE8]">Great coloring today. See you soon! 💤</p>
-            <button
-              onClick={() => {
-                setSleeping(false);
-                if (progress.music) startMusic();
-              }}
-              className="mt-6 rounded-full bg-white/20 px-8 py-3 font-black text-white active:scale-95"
-            >
-              Keep playing (5 min)
-            </button>
+            <span className="inline-block rounded-full bg-[#FFF0D2] px-3 py-1 text-xs font-black text-[#B7791F]">✨ For ages 3–8 · 100% original art</span>
+            <h1 className="mt-4 text-4xl font-black leading-tight text-[#3B2E5A] sm:text-5xl">
+              A magical world of <span className="bg-gradient-to-r from-[#FF4D94] to-[#FFB03A] bg-clip-text text-transparent">coloring & learning</span>
+            </h1>
+            <p className="mt-4 text-lg font-bold text-[#6B5B8A]">
+              {catalog.length}+ original coloring pages, 6 educational games, 500+ stickers and a talking buddy —
+              safe, ad-free and playable right now in your browser.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Link href="/play" className="rounded-full bg-gradient-to-r from-[#FF6B9D] to-[#FFB03A] px-8 py-4 text-lg font-black text-white shadow-lg active:scale-95">
+                ▶ Play now — free
+              </Link>
+              <span className="rounded-full border-2 border-dashed border-[#B9A7D6] px-6 py-3.5 text-sm font-black text-[#8E7CFF]">
+                🤖 Google Play — coming soon
+              </span>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-2 text-xs font-black text-[#6B5B8A]">
+              {["🚫 No ads", "🔒 COPPA-safe", "📴 Offline play", "🌍 9 languages", "☁️ Cloud save"].map((t) => (
+                <span key={t} className="rounded-full bg-white px-3 py-1.5 shadow-sm">{t}</span>
+              ))}
+            </div>
+          </div>
+          {/* live screenshots carousel */}
+          <div className="relative">
+            <div className="flex snap-x gap-4 overflow-x-auto pb-4">
+              {shots.map((p) => (
+                <div key={p.slug} className="w-56 shrink-0 snap-center rounded-3xl bg-white p-2 shadow-xl ring-1 ring-[#FFE1EF]">
+                  <PagePreview art={p} className="aspect-square w-full rounded-2xl" />
+                  <p className="px-1 py-1.5 text-center text-xs font-black text-[#6B5B8A]">{p.emoji} {p.title}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-center text-xs font-bold text-[#A99CC4]">← real pages from the game →</p>
           </div>
         </div>
-      )}
-      {buddyEl}
+      </section>
+
+      {/* stats */}
+      <section className="border-y border-[#FFE1EF] bg-white">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-4 px-4 py-8 text-center sm:grid-cols-4">
+          {[
+            [`${catalog.length}+`, "coloring pages"],
+            ["15", "magic brushes"],
+            ["6", "learning games"],
+            ["9", "languages"],
+          ].map(([n, l]) => (
+            <div key={l}>
+              <div className="text-3xl font-black text-[#FF4D94]">{n}</div>
+              <div className="text-sm font-bold text-[#6B5B8A]">{l}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* features */}
+      <section id="features" className="mx-auto max-w-6xl px-4 py-14">
+        <h2 className="text-center text-3xl font-black text-[#3B2E5A]">Everything your little artist needs</h2>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map(([e, t, d]) => (
+            <div key={t} className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#FFE1EF]">
+              <div className="text-4xl">{e}</div>
+              <h3 className="mt-2 font-black text-[#3B2E5A]">{t}</h3>
+              <p className="mt-1 text-sm font-bold text-[#6B5B8A]">{d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* categories */}
+      <section id="categories" className="bg-gradient-to-b from-white to-[#FFF0F8] py-14">
+        <div className="mx-auto max-w-6xl px-4">
+          <h2 className="text-center text-3xl font-black text-[#3B2E5A]">10 worlds to explore</h2>
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {CATEGORIES.map((c) => (
+              <Link key={c.key} href="/play" className="rounded-3xl bg-white p-4 text-center shadow-sm ring-1 ring-[#FFE1EF] transition hover:-translate-y-1">
+                <div className="text-4xl">{c.emoji}</div>
+                <div className="mt-1 text-sm font-black text-[#3B2E5A]">{c.label}</div>
+                <div className="text-xs font-bold text-[#A99CC4]">{counts[c.key] ?? 0} pages</div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* parents */}
+      <section id="parents" className="mx-auto max-w-6xl px-4 py-14">
+        <div className="grid items-center gap-8 rounded-[36px] bg-gradient-to-br from-[#8E7CFF] to-[#5AC8FA] p-8 text-white md:grid-cols-2">
+          <div>
+            <h2 className="text-3xl font-black">Built with parents in mind</h2>
+            <p className="mt-3 font-bold text-white/90">
+              Every design decision follows the Google Play Families Policy. Your child plays in a walled garden —
+              you hold the keys.
+            </p>
+            <div className="mt-5 grid gap-2 text-sm font-black">
+              {["🚫 No third-party ads, ever", "💬 No chat or social features", "🔐 All settings behind a parental gate", "🗑️ One-tap data deletion", "😴 Built-in sleep timer", "👨‍👩‍👧 Up to 4 child profiles with cloud backup"].map((t) => (
+                <span key={t}>{t}</span>
+              ))}
+            </div>
+            <div className="mt-6 flex gap-3 text-sm font-black">
+              <Link href="/privacy" className="rounded-full bg-white/20 px-4 py-2">Privacy Policy</Link>
+              <Link href="/terms" className="rounded-full bg-white/20 px-4 py-2">Terms</Link>
+              <Link href="/contact" className="rounded-full bg-white px-4 py-2 text-[#5A4FCF]">Contact us</Link>
+            </div>
+          </div>
+          <div className="rounded-3xl bg-white/15 p-6 backdrop-blur">
+            <h3 className="font-black">Try it together right now</h3>
+            <p className="mt-1 text-sm font-bold text-white/90">The full game runs in your browser — no install needed.</p>
+            <Link href="/play" className="mt-4 inline-block rounded-full bg-white px-8 py-4 text-lg font-black text-[#FF4D94] shadow-lg active:scale-95">
+              ▶ Open the game
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* faq */}
+      <section id="faq" className="mx-auto max-w-3xl px-4 py-14">
+        <h2 className="text-center text-3xl font-black text-[#3B2E5A]">Questions parents ask</h2>
+        <div className="mt-8 space-y-3">
+          {FAQ.map(([q, a]) => (
+            <details key={q} className="group rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#FFE1EF]">
+              <summary className="cursor-pointer list-none font-black text-[#3B2E5A]">
+                <span className="mr-2 inline-block text-[#FF4D94] transition group-open:rotate-90">▸</span>{q}
+              </summary>
+              <p className="mt-2 text-sm font-bold text-[#6B5B8A]">{a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      {/* final CTA */}
+      <section className="bg-gradient-to-r from-[#FF6B9D] to-[#FFB03A] py-14 text-center text-white">
+        <h2 className="text-3xl font-black sm:text-4xl">Ready to make some magic? 🌈</h2>
+        <p className="mt-2 font-bold text-white/90">Free, safe and playable in seconds.</p>
+        <Link href="/play" className="mt-6 inline-block rounded-full bg-white px-10 py-4 text-lg font-black text-[#FF4D94] shadow-xl active:scale-95">
+          ▶ Play now
+        </Link>
+      </section>
+
+      {/* footer */}
+      <footer className="bg-[#2D2440] py-10 text-center text-sm font-bold text-[#C7BEE8]">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-5 px-4">
+          <span className="text-base font-black text-white">🎨 Magic Coloring World</span>
+          <Link href="/about" className="hover:text-white">About</Link>
+          <Link href="/contact" className="hover:text-white">Contact</Link>
+          <Link href="/faq" className="hover:text-white">FAQ</Link>
+          <Link href="/privacy" className="hover:text-white">Privacy</Link>
+          <Link href="/terms" className="hover:text-white">Terms</Link>
+          <Link href="/play" className="hover:text-white">Play</Link>
+        </div>
+        <p className="mt-4 px-4">© {new Date().getFullYear()} Magic Coloring World · All artwork, sounds & characters are original.</p>
+      </footer>
     </main>
-  );
-}
-
-function TopBar({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <div className="flex items-center gap-2">
-      <button onClick={onBack} className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-2xl shadow active:scale-90" aria-label="Back">
-        ⬅️
-      </button>
-      <h2 className="rounded-full bg-white/85 px-4 py-2 text-lg font-black text-[#5B4B7A] shadow">{title}</h2>
-    </div>
-  );
-}
-
-function Tile({
-  emoji,
-  label,
-  tone,
-  onClick,
-  big,
-}: {
-  emoji: string;
-  label: string;
-  tone: string;
-  onClick: () => void;
-  big?: boolean;
-}) {
-  return (
-    <button
-      onClick={() => {
-        sfx.tap();
-        onClick();
-      }}
-      className={`group relative overflow-hidden rounded-[30px] bg-white shadow-xl transition hover:-translate-y-1 active:scale-95 ${big ? "py-8" : "py-6"}`}
-      style={{ boxShadow: `0 12px 26px ${tone}55` }}
-    >
-      <span
-        className="absolute inset-x-0 top-0 h-2"
-        style={{ background: `linear-gradient(90deg, ${tone}, #fff0)` }}
-      />
-      <div className={`${big ? "text-6xl" : "text-5xl"} transition group-active:scale-90`}>{emoji}</div>
-      <div className="mt-1 text-base font-black text-[#5B4B7A]">{label}</div>
-    </button>
-  );
-}
-
-function Bubbles() {
-  const bubbles = useMemo(
-    () =>
-      Array.from({ length: 14 }, (_, i) => ({
-        left: (i * 37) % 100,
-        size: 30 + ((i * 17) % 70),
-        delay: (i % 7) * 0.8,
-        dur: 9 + (i % 5) * 2,
-        emoji: ["🎈", "⭐", "✨", "🌸", "🫧", "🌟", "🍭"][i % 7],
-      })),
-    [],
-  );
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      {bubbles.map((b, i) => (
-        <span
-          key={i}
-          className="absolute bottom-[-80px] opacity-60"
-          style={{
-            left: `${b.left}%`,
-            fontSize: b.size,
-            animation: `rise ${b.dur}s linear ${b.delay}s infinite`,
-          }}
-        >
-          {b.emoji}
-        </span>
-      ))}
-    </div>
   );
 }

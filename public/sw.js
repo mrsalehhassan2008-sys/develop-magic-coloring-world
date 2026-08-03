@@ -3,7 +3,7 @@
  * works with no internet (a hard requirement for a kids app).
  */
 const CACHE = "mcw-v1";
-const CORE = ["/", "/offline", "/manifest.webmanifest", "/icon.png"];
+const CORE = ["/", "/play", "/offline", "/manifest.webmanifest", "/icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
