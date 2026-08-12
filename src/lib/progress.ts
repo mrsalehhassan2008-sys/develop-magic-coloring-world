@@ -30,6 +30,8 @@ export interface Progress {
   bigUi: boolean;
   colorblind: boolean;
   lang: string;
+  /** UI language (ar/en) */
+  uiLang: string;
   sound: boolean;
   music: boolean;
   musicTrack: string;
@@ -74,6 +76,7 @@ export const DEFAULT_PROGRESS: Progress = {
   bigUi: false,
   colorblind: false,
   lang: "en-US",
+  uiLang: "en",
   sound: true,
   music: true,
   musicTrack: "lullaby",

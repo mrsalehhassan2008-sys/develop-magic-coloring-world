@@ -207,7 +207,7 @@ export function Gallery({ onExit, progress }: { onExit: () => void; progress: Pr
           disabled={!mine.length}
           className="ml-auto rounded-full bg-gradient-to-r from-[#FF7FB6] to-[#FFB03A] px-4 py-2 text-sm font-black text-white shadow active:scale-95 disabled:opacity-40"
         >
-          📖 PDF Book
+          {tr(progress.uiLang,"pdf_book")}
         </button>
       </div>
       {loading ? (
@@ -301,9 +301,9 @@ export function ParentArea({
       <div className="fixed inset-0 z-40 grid place-items-center bg-[#2E2545]/70 p-4">
         <div className="w-full max-w-sm rounded-[32px] bg-white p-6 text-center shadow-2xl">
           <div className="text-4xl">🔒</div>
-          <h2 className="text-xl font-black text-[#2E2545]">Grown-ups only</h2>
+          <h2 className="text-xl font-black text-[#2E2545]">{tr(progress.uiLang,"gate_title")}</h2>
           <p className="mt-1 text-sm font-bold text-[#7A6C99]">
-            What is {challenge.a} × {challenge.b}?
+            {tr(progress.uiLang,"gate_q",{a:challenge.a,b:challenge.b})}
           </p>
           <input
             value={answer}
@@ -313,7 +313,7 @@ export function ParentArea({
             placeholder="?"
           />
           <div className="mt-3 flex gap-2">
-            <button onClick={onExit} className="flex-1 rounded-2xl bg-[#F3EFFF] py-3 font-black text-[#5B4B7A]">Back</button>
+            <button onClick={onExit} className="flex-1 rounded-2xl bg-[#F3EFFF] py-3 font-black text-[#5B4B7A]">{tr(progress.uiLang,"gate_back")}</button>
             <button
               onClick={() => {
                 if (Number(answer) === challenge.a * challenge.b) {
@@ -503,9 +503,9 @@ export function ParentArea({
           <Row label="Pages finished"><b className="font-black text-[#8E7CFF]">{progress.completed.length}</b></Row>
         </Card>
 
-        <Card title="👶 Kids & cloud codes">
+        <Card title={tr(progress.uiLang,"kids_title")}>
           <p className="mb-2 text-xs font-bold text-[#7A6C99]">
-            The 🔑 code restores a child (progress + premium) on any device via “Who is playing? → Restore”.
+            {tr(progress.uiLang,"kids_hint")}
           </p>
           <div className="space-y-2">
             {profiles.map((p) => (
@@ -582,9 +582,9 @@ export function ParentArea({
         <Card title="💳 Purchases & Ads">
           <Row label="Ads (kid-safe, non-personalised)"><span className="text-xs font-black text-[#7A6C99]">Disabled in this build</span></Row>
           <Row label="Remove ads / Premium packs"><button className="rounded-xl bg-[#F3EFFF] px-3 py-2 text-xs font-black text-[#5B4B7A]">Restore purchase</button></Row>
-          <Row label={progress.premiumUnlocked ? "🔓 Family premium" : "🔐 Family unlock code"}>
+          <Row label={tr(progress.uiLang, progress.premiumUnlocked ? "fam_active" : "fam_title")}>
             {progress.premiumUnlocked ? (
-              <span className="rounded-xl bg-[#7ED087] px-3 py-2 text-xs font-black text-white">✅ Active</span>
+              <span className="rounded-xl bg-[#7ED087] px-3 py-2 text-xs font-black text-white">{tr(progress.uiLang,"fam_activated")}</span>
             ) : (
               <div className="flex items-center gap-1">
                 <input
@@ -605,14 +605,12 @@ export function ParentArea({
                     } else {
                       sfx.wrong();
                       fx.shake(10);
-                      setFamMsg("Wrong code");
+                      setFamMsg(tr(progress.uiLang,"fam_wrong"));
                       setFamCode("");
                     }
                   }}
                   className="rounded-lg bg-gradient-to-r from-[#FFB03A] to-[#FF7FB6] px-3 py-1.5 text-xs font-black text-white active:scale-95"
-                >
-                  Activate
-                </button>
+                >{tr(progress.uiLang,"fam_activate")}</button>
               </div>
             )}
           </Row>
@@ -769,6 +767,7 @@ export function DailyReward({
 
 import { FAMILY_UNLOCK_CODE, STORE_ITEMS } from "@/lib/premium";
 import { purchase } from "@/lib/billing";
+import { tr } from "@/lib/i18n";
 
 export function Store({
   onExit,
@@ -805,7 +804,7 @@ export function Store({
       <div className="fixed inset-0 z-40 grid place-items-center bg-[#2E2545]/70 p-4">
         <div className="w-full max-w-sm rounded-[32px] bg-gradient-to-b from-[#FFF6DC] to-white p-6 text-center shadow-2xl">
           <div className="text-6xl">👑</div>
-          <h2 className="mt-2 text-2xl font-black text-[#2E2545]">Premium Active!</h2>
+          <h2 className="mt-2 text-2xl font-black text-[#2E2545]">{tr(progress.uiLang,"store_active")}</h2>
           <p className="mt-1 text-sm font-bold text-[#7A6C99]">All pictures, brushes and stickers are unlocked. Thank you!</p>
           <button onClick={onExit} className="mt-5 w-full rounded-2xl bg-[#7ED087] py-3 font-black text-white active:scale-95">Back to fun 🎨</button>
         </div>
@@ -819,8 +818,8 @@ export function Store({
       <div className="fixed inset-0 z-40 grid place-items-center bg-[#2E2545]/70 p-4">
         <div className="w-full max-w-sm rounded-[32px] bg-white p-6 text-center shadow-2xl">
           <div className="text-4xl">🔒</div>
-          <h2 className="text-xl font-black text-[#2E2545]">Grown-ups only</h2>
-          <p className="mt-1 text-sm font-bold text-[#7A6C99]">What is {challenge.a} × {challenge.b}?</p>
+          <h2 className="text-xl font-black text-[#2E2545]">{tr(progress.uiLang,"gate_title")}</h2>
+          <p className="mt-1 text-sm font-bold text-[#7A6C99]">{tr(progress.uiLang,"gate_q",{a:challenge.a,b:challenge.b})}</p>
           <input
             value={answer}
             onChange={(e) => setAnswer(e.target.value.replace(/\D/g, ""))}
@@ -829,7 +828,7 @@ export function Store({
             placeholder="?"
           />
           <div className="mt-3 flex gap-2">
-            <button onClick={onExit} className="flex-1 rounded-2xl bg-[#F3EFFF] py-3 font-black text-[#5B4B7A]">Back</button>
+            <button onClick={onExit} className="flex-1 rounded-2xl bg-[#F3EFFF] py-3 font-black text-[#5B4B7A]">{tr(progress.uiLang,"gate_back")}</button>
             <button
               onClick={() => {
                 if (Number(answer) === challenge.a * challenge.b) {
@@ -844,7 +843,7 @@ export function Store({
               }}
               className="flex-1 rounded-2xl bg-[#8E7CFF] py-3 font-black text-white"
             >
-              Continue
+              {tr(progress.uiLang,"gate_unlock")}
             </button>
           </div>
         </div>
@@ -857,12 +856,12 @@ export function Store({
       <div className="mx-auto max-w-lg space-y-3 pb-10">
         <div className="flex items-center gap-2">
           <button onClick={onExit} className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-2xl shadow-md" aria-label="Back">🏠</button>
-          <h2 className="rounded-full bg-white px-4 py-1.5 font-black text-[#5B4B7A] shadow">👑 Premium Store</h2>
+          <h2 className="rounded-full bg-white px-4 py-1.5 font-black text-[#5B4B7A] shadow">{tr(progress.uiLang,"store_title")}</h2>
         </div>
 
         <div className="rounded-3xl bg-white p-5 text-center shadow-lg">
           <div className="text-6xl">👑</div>
-          <h3 className="mt-2 text-xl font-black text-[#2E2545]">Unlock Everything</h3>
+          <h3 className="mt-2 text-xl font-black text-[#2E2545]">{tr(progress.uiLang,"store_all")}</h3>
           <div className="mt-3 grid grid-cols-2 gap-2 text-left text-sm font-bold text-[#5B4B7A]">
             <div className="rounded-2xl bg-[#FFF6DC] p-3">🎨 All 120+ pictures</div>
             <div className="rounded-2xl bg-[#EAF7FF] p-3">🏞️ All big scenes</div>
@@ -963,6 +962,7 @@ export function ProfilePicker({
   onDelete,
   onRestore,
   onClose,
+  uiLang,
 }: {
   profiles: Profile[];
   activeId: string;
@@ -971,6 +971,7 @@ export function ProfilePicker({
   onDelete: (id: string) => void;
   onRestore: (data: Progress) => void;
   onClose: () => void;
+  uiLang: string;
 }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -989,7 +990,7 @@ export function ProfilePicker({
         className="w-full max-w-md rounded-[32px] bg-white p-5 shadow-2xl"
         onPointerDown={(e) => e.stopPropagation()}
       >
-        <h2 className="text-center text-xl font-black text-[#2E2545]">👶 Who is playing?</h2>
+        <h2 className="text-center text-xl font-black text-[#2E2545]">{tr(uiLang,"who_title")}</h2>
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {profiles.map((p) => (
             <div key={p.id} className="relative">
@@ -1022,7 +1023,7 @@ export function ProfilePicker({
           {profiles.length < 4 && !adding && (
             <button onClick={() => setAdding(true)} className="rounded-3xl bg-[#F3FFE3] p-3 text-center shadow active:scale-95">
               <div className="text-4xl">➕</div>
-              <div className="mt-1 text-xs font-black text-[#5B4B7A]">Add kid</div>
+              <div className="mt-1 text-xs font-black text-[#5B4B7A]">{tr(uiLang,"who_add")}</div>
             </button>
           )}
         </div>
@@ -1055,13 +1056,13 @@ export function ProfilePicker({
               }}
               className="mt-2 w-full rounded-2xl bg-[#7ED087] py-3 font-black text-white active:scale-95"
             >
-              Create ✨
+              {tr(uiLang,"who_create")}
             </button>
           </div>
         )}
 
         <div className="mt-4 rounded-2xl bg-[#EAF7FF] p-3">
-          <p className="text-xs font-black text-[#2A6FE8]">📥 Restore on this device (from another phone/tablet)</p>
+          <p className="text-xs font-black text-[#2A6FE8]">{tr(uiLang,"who_restore")}</p>
           <div className="mt-2 flex gap-2">
             <input
               value={restoreCode}
@@ -1089,14 +1090,12 @@ export function ProfilePicker({
                 }
               }}
               className="shrink-0 rounded-xl bg-[#2A6FE8] px-4 py-2 font-black text-white active:scale-95"
-            >
-              Restore
-            </button>
+            >{tr(uiLang,"who_restore_btn")}</button>
           </div>
           {restoreMsg && <p className="mt-1 text-xs font-black text-[#2A6FE8]">{restoreMsg}</p>}
         </div>
 
-        <button onClick={onClose} className="mt-3 w-full rounded-2xl bg-[#F3EFFF] py-3 font-black text-[#5B4B7A]">Close</button>
+        <button onClick={onClose} className="mt-3 w-full rounded-2xl bg-[#F3EFFF] py-3 font-black text-[#5B4B7A]">{tr(uiLang,"who_close")}</button>
       </div>
       </div>
     </div>

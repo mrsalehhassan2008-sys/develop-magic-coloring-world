@@ -10,6 +10,8 @@ import AvatarDesigner from "@/components/AvatarDesigner";
 import { CATEGORIES } from "@/lib/art/catalog";
 import type { PageArt } from "@/lib/art/shapes";
 import { phrase, setAudioSetting, setMusicTrack, setVoiceCharacter, sfx, say, saySlow, startMusic, stopMusic, unlockAudio, type VoiceId } from "@/lib/audio";
+import { storeUILang, tr } from "@/lib/i18n";
+import { setUILang } from "@/components/LangEffect";
 import { useProgress } from "@/lib/progress";
 import { fx } from "@/components/FxLayer";
 import Buddy, { buddySpeak } from "@/components/Buddy";
@@ -171,6 +173,14 @@ export default function Home() {
   );
 
   const big = progress.bigUi;
+  const T = (k: string, vars?: Record<string, string | number>) => tr(progress.uiLang, k, vars);
+  const toggleUILang = () => {
+    const next = progress.uiLang === "ar" ? "en" : "ar";
+    update({ uiLang: next });
+    storeUILang(next);
+    setUILang(next);
+    sfx.tap();
+  };
 
   if (!ready) return <div className="grid min-h-screen place-items-center text-4xl">🎨</div>;
 
@@ -184,15 +194,15 @@ export default function Home() {
             Magic Coloring World
           </h1>
           <p className="mt-2 text-base font-black text-[#7A6C99]">
-            {totals.total || 122}+ original coloring pages · 6 games · 500+ stickers
+            {T("start_tag", { n: totals.total || 122 })}
           </p>
           <button
             onClick={begin}
             className="mt-7 rounded-full bg-gradient-to-r from-[#FF7FB6] to-[#FFB03A] px-12 py-5 text-2xl font-black text-white shadow-[0_14px_30px_rgba(255,127,182,.5)] transition active:scale-95"
           >
-            ▶️ Play
+            {T("start_play")}
           </button>
-          <p className="mt-4 text-xs font-bold text-[#A99CC4]">Best played with sound on 🔊</p>
+          <p className="mt-4 text-xs font-bold text-[#A99CC4]">{T("start_sound")}</p>
         </div>
       </main>
     );
@@ -333,7 +343,7 @@ export default function Home() {
               sfx.tap();
             }}
             className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-2xl shadow active:scale-90"
-            aria-label="Trophies"
+            aria-label={T("t_trophies")}
           >
             🏆
           </button>
@@ -359,6 +369,13 @@ export default function Home() {
             {progress.music ? "🎵" : "🔇"}
           </button>
           <button
+            onClick={toggleUILang}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-lg font-black text-[#5B4B7A] shadow active:scale-90"
+            aria-label="Language"
+          >
+            {progress.uiLang === "ar" ? "ع" : "EN"}
+          </button>
+          <button
             onClick={() => setView("parent")}
             className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-2xl shadow active:scale-90"
             aria-label="Parent area"
@@ -371,13 +388,13 @@ export default function Home() {
       {view === "home" && (
         <div className="relative z-10 mx-auto max-w-4xl px-3">
           <h1 className="text-center text-3xl font-black text-[#4B3B6E] drop-shadow-sm sm:text-4xl">
-            Hi {progress.name}! What shall we play? 🌈
+            {T("g_hi", { name: progress.name })}
           </h1>
           <div className={`mt-4 grid gap-3 ${big ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
-            <Tile emoji="🎨" label="Coloring" tone="#FF7FB6" onClick={() => { setView("categories"); buddySpeak("pickColor"); }} big />
+            <Tile emoji="🎨" label={T("t_coloring")} tone="#FF7FB6" onClick={() => { setView("categories"); buddySpeak("pickColor"); }} big />
             <Tile
               emoji="✏️"
-              label="Free Draw"
+              label={T("t_freedraw")}
               tone="#5AC8FA"
               onClick={() => {
                 setDrawMode("blank");
@@ -386,17 +403,17 @@ export default function Home() {
               }}
               big
             />
-            <Tile emoji="✍️" label="Trace" tone="#8E7CFF" onClick={() => setView("tracepick")} />
-            <Tile emoji="🎈" label="Balloon Pop" tone="#FF5C7A" onClick={() => setView("balloon")} />
-            <Tile emoji="🔢" label="Dot to Dot" tone="#FFB03A" onClick={() => setView("dots")} />
-            <Tile emoji="🌑" label="Shadow Match" tone="#6C7BD6" onClick={() => setView("shadow")} />
-            <Tile emoji="🏆" label="Trophies" tone="#FFD84D" onClick={() => setView("trophies")} />
-            <Tile emoji="🎭" label="My Buddy" tone="#FF9FC4" onClick={() => setView("buddy")} />
-            <Tile emoji="🎓" label="Learn" tone="#7ED087" onClick={() => setView("learn")} />
-            <Tile emoji="🖼️" label="My Gallery" tone="#38C6D9" onClick={() => setView("gallery")} />
+            <Tile emoji="✍️" label={T("t_trace")} tone="#8E7CFF" onClick={() => setView("tracepick")} />
+            <Tile emoji="🎈" label={T("t_balloon")} tone="#FF5C7A" onClick={() => setView("balloon")} />
+            <Tile emoji="🔢" label={T("t_dots")} tone="#FFB03A" onClick={() => setView("dots")} />
+            <Tile emoji="🌑" label={T("t_shadow")} tone="#6C7BD6" onClick={() => setView("shadow")} />
+            <Tile emoji="🏆" label={T("t_trophies")} tone="#FFD84D" onClick={() => setView("trophies")} />
+            <Tile emoji="🎭" label={T("t_buddy")} tone="#FF9FC4" onClick={() => setView("buddy")} />
+            <Tile emoji="🎓" label={T("t_learn")} tone="#7ED087" onClick={() => setView("learn")} />
+            <Tile emoji="🖼️" label={T("t_gallery")} tone="#38C6D9" onClick={() => setView("gallery")} />
             <Tile
               emoji="🪞"
-              label="Mirror Draw"
+              label={T("t_mirror")}
               tone="#B49BE0"
               onClick={() => {
                 setDrawMode("mirror");
@@ -406,7 +423,7 @@ export default function Home() {
             />
             <Tile
               emoji="▦"
-              label="Grid Draw"
+              label={T("t_grid")}
               tone="#FFC94D"
               onClick={() => {
                 setDrawMode("grid");
@@ -416,14 +433,14 @@ export default function Home() {
             />
           </div>
           <p className="mt-5 text-center text-xs font-bold text-[#A99CC4]">
-            {progress.completed.length} pages finished · Balloon best {progress.bestBalloon} · Dots reached #{progress.bestDots}
+            {T("home_foot",{c:progress.completed.length,b:progress.bestBalloon,d:progress.bestDots})}
           </p>
         </div>
       )}
 
       {view === "categories" && (
         <div className="relative z-10 mx-auto max-w-4xl px-3">
-          <TopBar title="🎨 Pick a picture book" onBack={() => setView("home")} />
+          <TopBar title={T("cat_pick")} onBack={() => setView("home")} />
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
             {CATEGORIES.map((c) => (
               <button
@@ -501,7 +518,7 @@ export default function Home() {
 
       {view === "tracepick" && (
         <div className="relative z-10 mx-auto max-w-4xl px-3">
-          <TopBar title="✍️ Trace &amp; Write" onBack={() => setView("home")} />
+          <TopBar title={T("trace_pick")} onBack={() => setView("home")} />
           <div className="mt-3 flex flex-wrap gap-2">
             {TRACE_SETS.map((s, i) => (
               <button
@@ -547,6 +564,7 @@ export default function Home() {
           onDelete={deleteProfile}
           onRestore={importProfile}
           onClose={() => setShowProfiles(false)}
+          uiLang={progress.uiLang}
         />
       )}
 

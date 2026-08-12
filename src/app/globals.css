@@ -110,6 +110,18 @@ input[type="range"] {
   border-radius: 99px;
 }
 
+/* RTL support: keep codes, numbers and latin text readable left-to-right */
+[dir="rtl"] .ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+[dir="rtl"] {
+  font-family: "Cairo", "Tajawal", "Baloo 2", "Nunito", system-ui, sans-serif;
+}
+[dir="rtl"] .flip-rtl {
+  transform: scaleX(-1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
