@@ -32,6 +32,14 @@ export interface Progress {
   lang: string;
   /** UI language (ar/en) */
   uiLang: string;
+  /** age band chosen at onboarding: tunes difficulty */
+  ageBand: "3-5" | "6-8" | null;
+  /** on-device, privacy-safe play counters (shown to parents only) */
+  stats: Record<string, number>;
+  /** purchased content packs (simulation until Play Billing is live) */
+  packs: string[];
+  /** voice speed multiplier chosen by parent (0.6 slow .. 1 normal) */
+  voiceRate: number;
   sound: boolean;
   music: boolean;
   musicTrack: string;
@@ -77,6 +85,10 @@ export const DEFAULT_PROGRESS: Progress = {
   colorblind: false,
   lang: "en-US",
   uiLang: "en",
+  ageBand: null,
+  stats: {},
+  packs: [],
+  voiceRate: 0.85,
   sound: true,
   music: true,
   musicTrack: "lullaby",

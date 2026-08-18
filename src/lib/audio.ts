@@ -11,7 +11,13 @@ export const settings = {
   sound: true,
   music: true,
   voice: true,
+  /** parent-controlled speech speed (0.6 very slow .. 1 normal) */
+  voiceRate: 0.85,
 };
+
+export function setVoiceRate(r: number) {
+  settings.voiceRate = Math.max(0.5, Math.min(1, r));
+}
 
 function ac(): Ctx | null {
   if (typeof window === "undefined") return null;
@@ -107,12 +113,16 @@ export const MUSIC_TRACKS = [
   { key: "lullaby", label: "Lullaby", emoji: "🌙" },
   { key: "happy", label: "Happy", emoji: "☀️" },
   { key: "dreamy", label: "Dreamy", emoji: "✨" },
+  { key: "waltz", label: "Waltz", emoji: "💃" },
+  { key: "adventure", label: "Adventure", emoji: "🗺️" },
 ] as const;
 
 const TRACK_SCALES: Record<string, { scale: number[]; interval: number; type: OscillatorType; vol: number }> = {
   lullaby: { scale: [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25], interval: 1900, type: "triangle", vol: 0.09 },
   happy: { scale: [329.63, 392.0, 440.0, 493.88, 587.33, 659.25, 783.99, 880.0], interval: 1300, type: "sine", vol: 0.08 },
   dreamy: { scale: [220.0, 261.63, 329.63, 349.23, 440.0, 523.25, 587.33, 698.46], interval: 2400, type: "sine", vol: 0.07 },
+  waltz: { scale: [293.66, 349.23, 440.0, 523.25, 587.33, 698.46, 880.0, 1046.5], interval: 1600, type: "triangle", vol: 0.08 },
+  adventure: { scale: [196.0, 246.94, 293.66, 392.0, 440.0, 493.88, 587.33, 783.99], interval: 1200, type: "sawtooth", vol: 0.05 },
 };
 
 let currentTrack = "lullaby";
@@ -257,7 +267,7 @@ export function say(text: string, lang = "en-US", voiceId?: VoiceId) {
     const char = VOICES.find((v) => v.id === (voiceId ?? voicePref.id)) ?? VOICES[0];
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang;
-    u.rate = char.rate; // slow & clear for children
+    u.rate = Math.min(1, char.rate * settings.voiceRate); // slow & clear for children
     u.pitch = char.pitch; // distinct pitch per character (works even with 1 system voice)
     u.volume = 1;
     const sysVoice = voiceForChar(char, lang);
@@ -279,7 +289,7 @@ export function saySlow(text: string, lang = "en-US", voiceId?: VoiceId) {
   words.forEach((w, i) => {
     const u = new SpeechSynthesisUtterance(w);
     u.lang = lang;
-    u.rate = char.rate;
+    u.rate = Math.min(1, char.rate * settings.voiceRate);
     u.pitch = char.pitch;
     if (sysVoice) u.voice = sysVoice;
     // small breathing gap between words

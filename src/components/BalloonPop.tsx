@@ -157,7 +157,7 @@ export default function BalloonPop({
       x: r + 20 + Math.random() * Math.max(40, g.w - 2 * r - 40),
       y: g.h + r + 20,
       r,
-      vy: (52 + Math.random() * 26) * (1 + g.level * 0.09),
+      vy: (52 + Math.random() * 26) * (1 + g.level * 0.09) * (progress.ageBand === "3-5" ? 0.72 : 1),
       sway: 18 + Math.random() * 28,
       phase: Math.random() * 6.28,
       color,

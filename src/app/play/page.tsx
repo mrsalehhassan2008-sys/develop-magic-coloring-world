@@ -9,7 +9,7 @@ import ShadowGame from "@/components/ShadowGame";
 import AvatarDesigner from "@/components/AvatarDesigner";
 import { CATEGORIES } from "@/lib/art/catalog";
 import type { PageArt } from "@/lib/art/shapes";
-import { phrase, setAudioSetting, setMusicTrack, setVoiceCharacter, sfx, say, saySlow, startMusic, stopMusic, unlockAudio, type VoiceId } from "@/lib/audio";
+import { phrase, setAudioSetting, setMusicTrack, setVoiceCharacter, setVoiceRate, sfx, say, saySlow, startMusic, stopMusic, unlockAudio, type VoiceId } from "@/lib/audio";
 import { storeUILang, tr } from "@/lib/i18n";
 import { setUILang } from "@/components/LangEffect";
 import { useProgress } from "@/lib/progress";
@@ -70,7 +70,8 @@ export default function Home() {
     setAudioSetting("voice", progress.voice);
     setVoiceCharacter((progress.voiceChar || "teacher_f") as VoiceId);
     setMusicTrack(progress.musicTrack || "lullaby");
-  }, [progress.sound, progress.music, progress.voice, progress.voiceChar, progress.musicTrack]);
+    setVoiceRate(progress.voiceRate ?? 0.85);
+  }, [progress.sound, progress.music, progress.voice, progress.voiceChar, progress.musicTrack, progress.voiceRate]);
 
   // watch for newly unlocked achievements
   useEffect(() => {
@@ -174,6 +175,16 @@ export default function Home() {
 
   const big = progress.bigUi;
   const T = (k: string, vars?: Record<string, string | number>) => tr(progress.uiLang, k, vars);
+  // privacy-safe local play counters (parents-only insights)
+  const track = useCallback(
+    (k: string) => update((p) => ({ stats: { ...p.stats, [k]: (p.stats[k] ?? 0) + 1 } })),
+    [update],
+  );
+  useEffect(() => {
+    const map: Record<string, string> = { balloon: "balloon", dots: "dots", shadow: "shadow", learn: "learn", studio: "coloring", draw: "coloring" };
+    if (map[view]) track(map[view]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
   const toggleUILang = () => {
     const next = progress.uiLang === "ar" ? "en" : "ar";
     update({ uiLang: next });
@@ -203,6 +214,37 @@ export default function Home() {
             {T("start_play")}
           </button>
           <p className="mt-4 text-xs font-bold text-[#A99CC4]">{T("start_sound")}</p>
+        </div>
+      </main>
+    );
+  }
+
+  // first-run onboarding: pick the child's age band to tune difficulty
+  if (started && !progress.ageBand) {
+    return (
+      <main className="grid min-h-[100dvh] place-items-center bg-[linear-gradient(160deg,#FFE8F4,#E7F3FF)] p-6">
+        <div className="w-full max-w-sm rounded-[32px] bg-white p-6 text-center shadow-2xl pop-in">
+          <div className="text-6xl">🎂</div>
+          <h1 className="mt-2 text-2xl font-black text-[#3B2E5A]">{progress.uiLang === "ar" ? "عمر الطفل كام؟" : "How old is the player?"}</h1>
+          <p className="mt-1 text-sm font-bold text-[#7A6C99]">
+            {progress.uiLang === "ar" ? "هنظبط الصعوبة والسرعة على قدّه" : "We'll tune difficulty & speed just right"}
+          </p>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            {(["3-5", "6-8"] as const).map((band) => (
+              <button
+                key={band}
+                onClick={() => {
+                  update({ ageBand: band });
+                  sfx.reward();
+                  say(band === "3-5" ? "Hi little one! Let's play gently." : "Hi! Ready for fun challenges?", progress.lang);
+                }}
+                className="rounded-3xl bg-gradient-to-b from-[#FFE9A8] to-[#FFB03A] py-6 text-2xl font-black text-[#5B4B7A] shadow-lg active:scale-95"
+              >
+                {band}
+                <div className="text-3xl">{band === "3-5" ? "🧸" : "🚀"}</div>
+              </button>
+            ))}
+          </div>
         </div>
       </main>
     );
@@ -466,7 +508,7 @@ export default function Home() {
           {loading && <p className="mt-6 text-center font-black text-[#B7A9D4]">Loading pictures…</p>}
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {(pages[category] ?? []).map((p) => {
-              const locked = !!p.premium && !progress.premiumUnlocked;
+              const locked = !!p.premium && !progress.premiumUnlocked && !progress.packs.includes(p.category);
               return (
                 <button
                   key={p.slug}

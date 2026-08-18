@@ -571,9 +571,24 @@ export default function Studio({
       } catch {
         /* offline / ignore */
       }
-    }, 1500);
+    }, 1000);
     return () => window.clearInterval(id);
   }, [roomCode, art, fillableCount, done, celebrate]);
+
+  // friendly nudge when a friend colors a region in co-op
+  const prevRemote = useRef(0);
+  useEffect(() => {
+    if (!roomCode) { prevRemote.current = 0; return; }
+    const n = Object.keys(fills).length;
+    if (prevRemote.current && n > prevRemote.current) {
+      const w = typeof window !== "undefined" ? window.innerWidth : 800;
+      const h = typeof window !== "undefined" ? window.innerHeight : 600;
+      fx.burst(w / 2, h / 2, 10, ["#FFD84D", "#7ED087", "#FFFFFF"], 240);
+      setToast("✨ A friend colored!");
+      window.setTimeout(() => setToast(null), 1500);
+    }
+    prevRemote.current = n;
+  }, [fills, roomCode]);
 
   /* ------------------------------- export ------------------------------- */
 

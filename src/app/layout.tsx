@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import FxLayer from "@/components/FxLayer";
 import SwRegister from "@/components/SwRegister";
 import LangEffect from "@/components/LangEffect";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -68,7 +69,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             }),
           }}
         />
-        <div id="shake-root">{children}</div>
+        <ErrorBoundary>
+          <div id="shake-root">{children}</div>
+        </ErrorBoundary>
         <FxLayer />
         <SwRegister />
         <LangEffect />

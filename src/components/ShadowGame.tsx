@@ -51,12 +51,14 @@ export default function ShadowGame({
   const [wrong, setWrong] = useState<string | null>(null);
 
   const level = Math.min(4, 1 + Math.floor(round / 3));
-  const count = Math.min(6, 2 + level); // 3 -> 6 shadows
+  const gentle = progress.ageBand === "3-5";
+  const count = gentle ? Math.min(4, 1 + level) : Math.min(6, 2 + level); // 3 -> 6 shadows
 
   const newRound = useCallback(
     (r: number) => {
       const lv = Math.min(4, 1 + Math.floor(r / 3));
-      const n = Math.min(6, 2 + lv);
+      const g35 = progress.ageBand === "3-5";
+      const n = g35 ? Math.min(4, 1 + lv) : Math.min(6, 2 + lv);
       const t = POOL[(Math.random() * POOL.length) | 0];
       // harder levels pull distractors from the target's look-alike family
       let pool: string[];
@@ -70,7 +72,7 @@ export default function ShadowGame({
       const opts = shuffle([t, ...distract]).map((e) => ({
         e,
         // top level tilts the shadows to make matching trickier
-        rot: lv >= 4 && e !== t ? Math.round((Math.random() - 0.5) * 36) : 0,
+        rot: lv >= 4 && !g35 && e !== t ? Math.round((Math.random() - 0.5) * 36) : 0,
       }));
       setTarget(t);
       setOptions(opts);

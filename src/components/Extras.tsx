@@ -5,7 +5,6 @@ import { fx } from "@/components/FxLayer";
 import { availableVoiceCount, MUSIC_TRACKS, phrase, say, setAudioSetting, setMusicTrack, setVoiceCharacter, sfx, VOICES, type VoiceId } from "@/lib/audio";
 import { BUDDY_FACES, buddyLine } from "@/lib/buddy";
 import { ACHIEVEMENTS } from "@/lib/achievements";
-import { jsPDF } from "jspdf";
 import { AVATARS, DEFAULT_PROGRESS, LANGS, type Profile, type Progress } from "@/lib/progress";
 
 /* ============================== LEARN MODE ============================== */
@@ -155,8 +154,9 @@ export function Gallery({ onExit, progress }: { onExit: () => void; progress: Pr
 
   const mine = items.filter((a) => !a.profile || a.profile === "kid" || a.profile === progress.name);
 
-  const makePdf = () => {
+  const makePdf = async () => {
     if (!mine.length) return;
+    const { jsPDF } = await import("jspdf");
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const W = 595;
     const H = 842;
@@ -579,6 +579,29 @@ export function ParentArea({
           </div>
         </Card>
 
+        <Card title={tr(progress.uiLang,"insights_title")}>
+          <p className="mb-2 text-xs font-bold text-[#7A6C99]">{tr(progress.uiLang,"insights_hint")}</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {([["st_coloring","🎨"],["st_balloon","🎈"],["st_dots","🔢"],["st_shadow","🌑"],["st_learn","🎓"]] as const).map(([k,e]) => (
+              <div key={k} className="rounded-2xl bg-[#FBF7FF] p-2 text-center">
+                <div className="text-xl">{e}</div>
+                <div className="text-lg font-black text-[#8E7CFF]">{progress.stats?.[k.replace("st_","")] ?? 0}</div>
+                <div className="text-[9px] font-black text-[#A99CC4]">{tr(progress.uiLang,k)}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center gap-2 rounded-2xl bg-[#FBF7FF] px-3 py-2">
+            <span className="text-sm font-black text-[#5B4B7A]">{tr(progress.uiLang,"voice_speed")}</span>
+            <input
+              type="range" min={0.6} max={1} step={0.05}
+              value={progress.voiceRate ?? 0.85}
+              onChange={(e) => { const v = Number(e.target.value); update({ voiceRate: v }); setVoiceRate(v); }}
+              className="w-full accent-[#8E7CFF]"
+              aria-label="voice speed"
+            />
+          </div>
+        </Card>
+
         <Card title="💳 Purchases & Ads">
           <Row label="Ads (kid-safe, non-personalised)"><span className="text-xs font-black text-[#7A6C99]">Disabled in this build</span></Row>
           <Row label="Remove ads / Premium packs"><button className="rounded-xl bg-[#F3EFFF] px-3 py-2 text-xs font-black text-[#5B4B7A]">Restore purchase</button></Row>
@@ -767,6 +790,7 @@ export function DailyReward({
 
 import { FAMILY_UNLOCK_CODE, STORE_ITEMS } from "@/lib/premium";
 import { purchase } from "@/lib/billing";
+import { setVoiceRate } from "@/lib/audio";
 import { tr } from "@/lib/i18n";
 
 export function Store({
@@ -792,11 +816,16 @@ export function Store({
       say("Something went wrong, please try again.", progress.lang);
       return;
     }
-    update({ premiumUnlocked: true });
+    if (productId === "premium_pack_pages") {
+      update({ packs: ["dinosaurs", "princesses", "space", "scenes", "cars", "sea", "farm", "birds", "flowers", "food", "animals"] });
+      say("New worlds unlocked!", progress.lang);
+    } else {
+      update({ premiumUnlocked: true });
+      say("Everything is unlocked! Enjoy!", progress.lang);
+    }
     sfx.reward();
     fx.confetti(180);
     fx.shake(12);
-    say("Everything is unlocked! Enjoy!", progress.lang);
   };
 
   if (progress.premiumUnlocked) {

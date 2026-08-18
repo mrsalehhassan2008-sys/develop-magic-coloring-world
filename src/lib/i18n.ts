@@ -142,6 +142,15 @@ const en: Record<string, string> = {
   q6a: "The web version is fully playable right now. The Google Play release is on its way — press “Play now” to try it instantly in your browser.",
   store_all: "Unlock Everything",
   store_active: "Premium Active!",
+  insights_title: "📊 Your child's activity (on this device only)",
+  insights_hint: "Private counters — never sent to any server.",
+  st_coloring: "Coloring sessions",
+  st_balloon: "Balloon Pop plays",
+  st_dots: "Dot-to-Dot plays",
+  st_shadow: "Shadow Match plays",
+  st_learn: "Learn & Say taps",
+  voice_speed: "🐢 Voice speed",
+  packs_title: "🎒 Content packs",
 };
 
 const ar: Record<string, string> = {
@@ -264,6 +273,15 @@ const ar: Record<string, string> = {
   q6a: "نسخة الويب شغالة كاملة دلوقتي. نسخة جوجل بلاي في الطريق — دوس «العب الآن» لتجربها فوراً في المتصفح.",
   store_all: "افتح كل حاجة",
   store_active: "البريميوم شغّال!",
+  insights_title: "📊 نشاط طفلك (على الجهاز ده بس)",
+  insights_hint: "عدّادات خصوصية — مش بتتبعت لأي سيرفر.",
+  st_coloring: "جلسات تلوين",
+  st_balloon: "لعب فرقعة البالونات",
+  st_dots: "لعب وصّل النقط",
+  st_shadow: "لعب طابق الظل",
+  st_learn: "ضغطات تعلّم وانطق",
+  voice_speed: "🐢 سرعة الصوت",
+  packs_title: "🎒 باقات المحتوى",
 };
 
 const DICTS: Record<string, Record<string, string>> = { en, ar };

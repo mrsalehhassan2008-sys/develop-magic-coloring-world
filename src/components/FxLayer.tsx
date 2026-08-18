@@ -20,6 +20,10 @@ interface P {
 
 const parts: P[] = [];
 const state = { shake: 0, shakeMax: 0 };
+/** auto-detected low-end device → halves particle load to protect 60fps */
+let lowPerf = false;
+let fpsAcc = 0;
+let fpsFrames = 0;
 
 const CANDY = ["#FF5C7A", "#FFB03A", "#FFD84D", "#7ED087", "#5AC8FA", "#8E7CFF", "#FF7FB6", "#38C6D9"];
 
@@ -43,7 +47,8 @@ function push(p: Partial<P> & { x: number; y: number }) {
 export const fx = {
   /** small pop of particles at screen coords */
   burst(x: number, y: number, count = 18, colors?: string[], power = 340) {
-    for (let i = 0; i < count; i++) {
+    const n = lowPerf ? Math.ceil(count / 2) : count;
+    for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
       const sp = power * (0.35 + Math.random() * 0.75);
       push({
@@ -64,7 +69,8 @@ export const fx = {
   },
   confetti(count = 120) {
     const w = typeof window !== "undefined" ? window.innerWidth : 800;
-    for (let i = 0; i < count; i++) {
+    const n = lowPerf ? Math.ceil(count / 2) : count;
+    for (let i = 0; i < n; i++) {
       push({
         x: Math.random() * w,
         y: -20 - Math.random() * 200,
@@ -132,6 +138,16 @@ export default function FxLayer() {
     const loop = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
+      // fps guard: sample over ~1s, downgrade effects on slow devices
+      fpsAcc += dt;
+      fpsFrames++;
+      if (fpsAcc >= 1) {
+        const fps = fpsFrames / fpsAcc;
+        if (fps < 42) lowPerf = true;
+        else if (fps > 55) lowPerf = false;
+        fpsAcc = 0;
+        fpsFrames = 0;
+      }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 

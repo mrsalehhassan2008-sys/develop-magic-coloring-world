@@ -1,5 +1,5 @@
 import { bird, car, critter, CritterOpts, dino, DinoOpts, flower, food, makePage, princess, sea, space } from "./builders";
-import { PageArt, resetIds } from "./shapes";
+import { ell, PageArt, poly, resetIds, rrect, Shape } from "./shapes";
 import { buildScenes } from "./scenes";
 
 export const CATEGORIES = [
@@ -39,6 +39,14 @@ const ANIMALS: Spec[] = [
   ["hedgehog", "Spiky Hedgehog", { fur: "#E0BE93", belly: "#FFEFD6", ear: "round", snout: "long", mane: "#9A7250" }],
   ["raccoon", "Masked Raccoon", { fur: "#A9A9C4", belly: "#E6E6F5", ear: "pointy", snout: "long", spots: "#5A5670", tail: "long", tailColor: "#8C8BA8" }],
   ["deer", "Forest Deer", { fur: "#D9A46B", belly: "#FFE7C8", ear: "pointy", snout: "oval", spots: "#FFF0D2", horns: true }],
+  ["seal", "Happy Seal", { fur: "#B9C3D6", belly: "#E8EEFA", ear: "floppy", snout: "oval", snoutColor: "#DCE5F5" }],
+  ["bat", "Little Bat", { fur: "#8E7CFF", belly: "#DDD6FF", ear: "pointy", snout: "none" }],
+  ["moose", "Moose", { fur: "#A9723F", belly: "#E0BE93", ear: "round", snout: "long", horns: true }],
+  ["chipmunk", "Chipmunk", { fur: "#D98E5B", belly: "#FFE9CC", ear: "tuft", snout: "oval", stripes: 3 }],
+  ["badger", "Badger", { fur: "#C9C6E0", belly: "#F1EFFF", ear: "round", snout: "long", spots: "#5A5670" }],
+  ["gazelle", "Gazelle", { fur: "#E8C08A", belly: "#FFF3DE", ear: "pointy", snout: "long", horns: true }],
+  ["otter", "Otter", { fur: "#B07C4F", belly: "#F6D9AE", ear: "round", snout: "oval", tail: "long" }],
+  ["lamb", "Little Lamb", { fur: "#F6F3FF", belly: "#FFFFFF", ear: "floppy", snout: "oval", fluff: true, mane: "#FFF9EC" }],
 ];
 
 const FARM: Spec[] = [
@@ -197,6 +205,24 @@ export function buildCatalog(): PageArt[] {
     pages.push(makePage(`food-${slug}`, title, "food", "🍓", 1 + (i % 3), food(kind, a, b))),
   );
 
+
+  // Night-time variants: same beloved characters under a starry sky
+  const STAR = (x: number, y: number): Shape => poly([x, y - 10, x + 3, y - 3, x + 10, y, x + 3, y + 3, x, y + 10, x - 3, y + 3, x - 10, y, x - 3, y - 3], "#FFE066");
+  for (const base of [...pages]) {
+    if (!["animals", "farm", "sea", "birds"].includes(base.category)) continue;
+    pages.push({
+      ...base,
+      slug: `${base.slug}-night`,
+      title: `${base.title} 🌙`,
+      shapes: [
+        rrect(0, 0, 400, 400, 0, "#2A2350", { sw: 0 }),
+        ell(330, 60, 30, 30, "#FFF3B8"),
+        ell(318, 52, 26, 26, "#2A2350", { sw: 0 }),
+        STAR(70, 60), STAR(140, 110), STAR(250, 50), STAR(60, 180), STAR(340, 150),
+        ...base.shapes,
+      ],
+    });
+  }
   // ---- Freemium: keep a generous free tier, lock the rest as Premium ----
   // Free = first N of each category (scenes get 2 free, others get 3 free).
   const seen: Record<string, number> = {};
