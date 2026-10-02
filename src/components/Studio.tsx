@@ -1,138 +1,27 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PageArt, Shape } from "@/lib/art/shapes";
+import { PageArt, type Shape } from "@/lib/art/shapes";
 import { PALETTES, STICKER_PACKS, Swatch } from "@/lib/palette";
 import { randomPraise, say, sfx } from "@/lib/audio";
 import { buddySpeak } from "@/components/Buddy";
 import { isBrushPremium, isStickerPackPremium } from "@/lib/premium";
 import { fx } from "@/components/FxLayer";
 import type { Progress } from "@/lib/progress";
+import { TOOLS, BASE_FILL, type Stroke, type Sticker, type Snapshot } from "@/components/studio/tools";
+import { ShapeEl, PagePreview } from "@/components/studio/ShapeEl";
+import {
+  IconBtn,
+  SwatchBtn,
+  NumberChip,
+  countFilledIn,
+  nearStroke,
+} from "@/components/studio/ui";
 
-/* ------------------------------- tools ---------------------------------- */
-
-export interface ToolDef {
-  id: string;
-  label: string;
-  emoji: string;
-  size: number;
-  opacity: number;
-  cap: "round" | "butt" | "square";
-  dash?: string;
-  glow?: boolean;
-  blur?: number;
-  paint?: "color" | "rainbow" | "glitter";
-}
-
-export const TOOLS: ToolDef[] = [
-  { id: "bucket", label: "Fill", emoji: "🪣", size: 0, opacity: 1, cap: "round" },
-  { id: "brush", label: "Brush", emoji: "🖌️", size: 16, opacity: 1, cap: "round" },
-  { id: "crayon", label: "Crayon", emoji: "🖍️", size: 20, opacity: 0.85, cap: "round", dash: "14 3" },
-  { id: "marker", label: "Marker", emoji: "🖊️", size: 22, opacity: 0.65, cap: "square" },
-  { id: "pencil", label: "Pencil", emoji: "✏️", size: 5, opacity: 0.9, cap: "round" },
-  { id: "water", label: "Watercolor", emoji: "💧", size: 40, opacity: 0.3, cap: "round", blur: 6 },
-  { id: "air", label: "Air Brush", emoji: "🎐", size: 46, opacity: 0.2, cap: "round", blur: 10 },
-  { id: "glitter", label: "Glitter", emoji: "✨", size: 18, opacity: 1, cap: "round", dash: "1 14", paint: "glitter" },
-  { id: "rainbow", label: "Rainbow", emoji: "🌈", size: 24, opacity: 1, cap: "round", paint: "rainbow" },
-  { id: "neon", label: "Neon", emoji: "💡", size: 14, opacity: 1, cap: "round", glow: true },
-  { id: "magic", label: "Magic", emoji: "🪄", size: 20, opacity: 0.95, cap: "round", glow: true, paint: "rainbow" },
-  { id: "pattern", label: "Pattern", emoji: "🔵", size: 22, opacity: 1, cap: "round", dash: "1 26" },
-  { id: "texture", label: "Texture", emoji: "🧱", size: 24, opacity: 0.8, cap: "butt", dash: "12 7" },
-  { id: "sticker", label: "Stickers", emoji: "🌟", size: 0, opacity: 1, cap: "round" },
-  { id: "eraser", label: "Eraser", emoji: "🧽", size: 30, opacity: 1, cap: "round" },
-];
-
-interface Stroke {
-  id: string;
-  tool: string;
-  color: string;
-  size: number;
-  opacity: number;
-  d: string;
-}
-interface Sticker {
-  id: string;
-  emoji: string;
-  x: number;
-  y: number;
-  s: number;
-  r: number;
-}
-interface Snapshot {
-  fills: Record<string, string>;
-  strokes: Stroke[];
-  stickers: Sticker[];
-}
-
-const BASE_FILL = "#FFFFFF";
-
-/* --------------------------- shape renderer ------------------------------ */
-
-export function ShapeEl({
-  s,
-  fill,
-  onPick,
-}: {
-  s: Shape;
-  fill: string;
-  onPick?: (id: string, e: React.PointerEvent) => void;
-}) {
-  const stroke = s.sc ?? "#2E2545";
-  const sw = s.sw ?? 5;
-  const common = {
-    fill: s.k === "line" ? "none" : fill,
-    stroke,
-    strokeWidth: sw,
-    strokeLinejoin: "round" as const,
-    strokeLinecap: "round" as const,
-    onPointerDown: onPick ? (e: React.PointerEvent) => onPick(s.id, e) : undefined,
-    style: onPick ? { cursor: "pointer" } : undefined,
-  };
-  if (s.k === "ellipse")
-    return (
-      <ellipse
-        {...common}
-        cx={s.cx}
-        cy={s.cy}
-        rx={s.rx}
-        ry={s.ry}
-        transform={s.rot ? `rotate(${s.rot} ${s.cx} ${s.cy})` : undefined}
-      />
-    );
-  if (s.k === "rect")
-    return (
-      <rect
-        {...common}
-        x={s.x}
-        y={s.y}
-        width={s.w}
-        height={s.h}
-        rx={s.r ?? 8}
-        transform={s.rot ? `rotate(${s.rot} ${(s.x ?? 0) + (s.w ?? 0) / 2} ${(s.y ?? 0) + (s.h ?? 0) / 2})` : undefined}
-      />
-    );
-  if (s.k === "poly") {
-    const pts = (s.pts ?? []).reduce<string[]>((acc, n, i) => {
-      if (i % 2 === 0) acc.push(`${n}`);
-      else acc[acc.length - 1] += `,${n}`;
-      return acc;
-    }, []);
-    return <polygon {...common} points={pts.join(" ")} transform={s.rot ? `rotate(${s.rot} 200 200)` : undefined} />;
-  }
-  return <path {...common} d={s.d} transform={s.rot ? `rotate(${s.rot} 200 200)` : undefined} />;
-}
-
-export function PagePreview({ art, className }: { art: PageArt; className?: string }) {
-  return (
-    <svg viewBox={art.viewBox} className={className} aria-hidden>
-      {art.shapes.map((s) => (
-        <ShapeEl key={s.id} s={s} fill={s.c} />
-      ))}
-    </svg>
-  );
-}
-
-/* -------------------------------- studio -------------------------------- */
+// Re-export so existing imports from "@/components/Studio" keep working
+export { TOOLS, type ToolDef } from "@/components/studio/tools";
+export { ShapeEl, PagePreview } from "@/components/studio/ShapeEl";
+export { IconBtn } from "@/components/studio/ui";
 
 export default function Studio({
   art,
@@ -520,7 +409,7 @@ export default function Studio({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ fills: fillsRef.current, stickers: stickersRef.current, name: progress.name }),
       }).catch(() => undefined);
-    }, 600);
+    }, 450);
   }, [roomCode, progress.name]);
 
   const markEdited = useCallback(
@@ -571,7 +460,7 @@ export default function Studio({
       } catch {
         /* offline / ignore */
       }
-    }, 1000);
+    }, 850);
     return () => window.clearInterval(id);
   }, [roomCode, art, fillableCount, done, celebrate]);
 
@@ -1376,102 +1265,4 @@ export default function Studio({
   );
 }
 
-function NumberChip({
-  num,
-  color,
-  active,
-  done,
-  onClick,
-}: {
-  num: number;
-  color: string;
-  active: boolean;
-  done: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      aria-label={`Color number ${num}`}
-      className={`relative grid h-11 w-11 place-items-center rounded-2xl border-4 text-sm font-black shadow transition active:scale-90 ${
-        active ? "border-[#2E2545] scale-110" : "border-white"
-      }`}
-      style={{ background: color, color: readableText(color) }}
-    >
-      {done ? "✓" : num}
-    </button>
-  );
-}
 
-/** black or white text depending on background luminance */
-function readableText(hex: string) {
-  const m = hex.replace("#", "");
-  if (m.length < 6) return "#2E2545";
-  const r = parseInt(m.slice(0, 2), 16);
-  const g = parseInt(m.slice(2, 4), 16);
-  const b = parseInt(m.slice(4, 6), 16);
-  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return lum > 0.6 ? "#2E2545" : "#FFFFFF";
-}
-
-function SwatchBtn({ s, active, onClick }: { s: Swatch; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-label={s.id}
-      className={`h-10 w-10 shrink-0 rounded-full border-4 transition active:scale-90 ${active ? "border-[#2E2545] scale-110" : "border-white"}`}
-      style={{
-        background:
-          s.special === "rainbow"
-            ? "conic-gradient(#FF5C7A,#FFB03A,#FFE066,#7ED087,#5AC8FA,#8E7CFF,#FF5C7A)"
-            : s.special === "glitter"
-              ? "linear-gradient(135deg,#FFF6C9,#FFD84D,#FFB03A)"
-              : s.special === "metal"
-                ? `linear-gradient(135deg,#fff,${s.color},#fff,${s.color})`
-                : s.color,
-        boxShadow: "0 4px 10px rgba(90,60,130,.18)",
-      }}
-    />
-  );
-}
-
-/** number of real fillable regions that currently have a colour */
-function countFilledIn(art: PageArt, fills: Record<string, string>) {
-  return art.shapes.filter((s) => s.f !== false && fills[s.id]).length;
-}
-
-function nearStroke(d: string, x: number, y: number, r: number) {
-  const nums = d.match(/-?\d+(\.\d+)?/g);
-  if (!nums) return false;
-  for (let i = 0; i + 1 < nums.length; i += 2) {
-    if (Math.hypot(Number(nums[i]) - x, Number(nums[i + 1]) - y) < r) return true;
-  }
-  return false;
-}
-
-export function IconBtn({
-  label,
-  emoji,
-  onClick,
-  disabled,
-  tone = "#8E7CFF",
-}: {
-  label: string;
-  emoji: string;
-  onClick: () => void;
-  disabled?: boolean;
-  tone?: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      title={label}
-      className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-2xl shadow-md transition active:scale-90 disabled:opacity-35 sm:h-14 sm:w-14"
-      style={{ background: `linear-gradient(180deg,#fff, ${tone}33)` }}
-    >
-      {emoji}
-    </button>
-  );
-}

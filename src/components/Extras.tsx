@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fx } from "@/components/FxLayer";
-import { availableVoiceCount, MUSIC_TRACKS, phrase, say, setAudioSetting, setMusicTrack, setVoiceCharacter, sfx, VOICES, type VoiceId } from "@/lib/audio";
+import { availableVoiceCount, MUSIC_TRACKS, phrase, say, setAudioSetting, setMusicTrack, setVoiceCharacter, setVoiceRate, sfx, VOICES, type VoiceId } from "@/lib/audio";
 import { BUDDY_FACES, buddyLine } from "@/lib/buddy";
 import { ACHIEVEMENTS } from "@/lib/achievements";
 import { AVATARS, DEFAULT_PROGRESS, LANGS, type Profile, type Progress } from "@/lib/progress";
+import { FAMILY_UNLOCK_CODE, STORE_ITEMS } from "@/lib/premium";
+import { purchase, restorePurchases } from "@/lib/billing";
+import { tr } from "@/lib/i18n";
 
 /* ============================== LEARN MODE ============================== */
 
@@ -604,7 +607,16 @@ export function ParentArea({
 
         <Card title="💳 Purchases & Ads">
           <Row label="Ads (kid-safe, non-personalised)"><span className="text-xs font-black text-[#7A6C99]">Disabled in this build</span></Row>
-          <Row label="Remove ads / Premium packs"><button className="rounded-xl bg-[#F3EFFF] px-3 py-2 text-xs font-black text-[#5B4B7A]">Restore purchase</button></Row>
+          <Row label="Remove ads / Premium packs"><button onClick={async () => {
+              const owned = await restorePurchases();
+              if (owned.includes("premium_unlock_all")) {
+                update({ premiumUnlocked: true });
+                sfx.reward();
+                say("Premium restored!", progress.lang);
+              } else {
+                say("No previous purchases found.", progress.lang);
+              }
+            }} className="rounded-xl bg-[#F3EFFF] px-3 py-2 text-xs font-black text-[#5B4B7A]">Restore purchase</button></Row>
           <Row label={tr(progress.uiLang, progress.premiumUnlocked ? "fam_active" : "fam_title")}>
             {progress.premiumUnlocked ? (
               <span className="rounded-xl bg-[#7ED087] px-3 py-2 text-xs font-black text-white">{tr(progress.uiLang,"fam_activated")}</span>
@@ -788,10 +800,6 @@ export function DailyReward({
 
 /* ============================== STORE ================================== */
 
-import { FAMILY_UNLOCK_CODE, STORE_ITEMS } from "@/lib/premium";
-import { purchase } from "@/lib/billing";
-import { setVoiceRate } from "@/lib/audio";
-import { tr } from "@/lib/i18n";
 
 export function Store({
   onExit,
@@ -917,10 +925,22 @@ export function Store({
             })}
           </div>
           <button
-            onClick={() => {
-              // restore purchase placeholder (Google Play restores automatically)
+            onClick={async () => {
               say("Checking your purchases…", progress.lang);
               sfx.tap();
+              const owned = await restorePurchases();
+              if (owned.includes("premium_unlock_all")) {
+                update({ premiumUnlocked: true });
+                say("Everything is unlocked! Enjoy!", progress.lang);
+                sfx.reward();
+                fx.confetti(120);
+              } else if (owned.includes("premium_pack_pages")) {
+                update({ packs: ["dinosaurs", "princesses", "space", "scenes", "cars", "sea", "farm", "birds", "flowers", "food", "animals"] });
+                say("Your pages are restored!", progress.lang);
+                sfx.reward();
+              } else {
+                say("No previous purchases found.", progress.lang);
+              }
             }}
             className="mt-2 w-full rounded-2xl bg-[#F3EFFF] py-3 text-sm font-black text-[#5B4B7A]"
           >
